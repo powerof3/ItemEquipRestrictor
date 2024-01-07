@@ -1,0 +1,13 @@
+{
+  "name": "item-equip-restrictor",
+  "version-string": "1.0.0",
+  "description": "",
+  "homepage": "",
+  "license": "MIT",
+  "dependencies": [
+    "clib-util",
+    "rsm-binary-io",
+    "spdlog",
+    "xbyak"
+  ]
+}
