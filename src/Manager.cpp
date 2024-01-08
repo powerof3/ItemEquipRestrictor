@@ -51,76 +51,101 @@ namespace ItemRestrictor
 			edids.emplace_back(edid::get_editorID(a_npc));
 		}
 
-		const auto split_filters = string::split(restrict_kywd[1], "+");
+		const auto match_filter = [&](const std::string& a_filter) {
+			// RestrictEquip:Female -> men cannot wear this
+			// RestrictEquip:!Female -> only men can wear this
 
-		bool shouldSkip = std::ranges::all_of(split_filters, [&](const std::string& a_filter) {
-			switch (string::const_hash(a_filter)) {
+			// RestrictEquip:ActorTypeVampire -> only vampires can wear this
+			// RestrictEquip:!ActorTypeVampire -> vampires cannot wear this
+
+			std::string filter_copy = a_filter;
+
+			bool invert = false;
+			if (filter_copy.starts_with('!')) {
+				invert = true;
+				filter_copy.erase(0, 1);
+			}
+
+			switch (string::const_hash(filter_copy)) {
 			case "Male"_h:
-				return sex == RE::SEX::kMale;
+				return invert ? sex == RE::SEX::kFemale : sex == RE::SEX::kMale;
 			case "Female"_h:
-				return sex == RE::SEX::kFemale;
+				return invert ? sex == RE::SEX::kMale : sex == RE::SEX::kFemale;
 			case "Player"_h:
-				return isPlayer;
+				return invert ? !isPlayer : isPlayer;
 			case "NPC"_h:
-				return !isPlayer;
+				return invert ? isPlayer : !isPlayer;
 			default:
 				{
-					if (a_filter.starts_with("Level(")) {
-						auto filterLevel = a_filter;
-						string::remove_non_numeric(filterLevel);
+					if (filter_copy.starts_with("Level(")) {
+						string::remove_non_numeric(filter_copy);
 
-						const auto level = string::to_num<std::uint16_t>(filterLevel);
-						if (actorLevel < level) {
-							a_params.restrictReason = RESTRICT_REASON::kLevel;
+						const auto level = string::to_num<std::uint16_t>(filter_copy);
+						if (actorLevel >= level) {
 							return true;
 						}
+						a_params.restrictReason = RESTRICT_REASON::kLevel;
 						return false;
 					}
 
-					if (a_filter.contains("(")) {
-						auto filterSkill = a_filter;
-						string::remove_non_alphanumeric(filterSkill);
+					if (filter_copy.contains("(")) {
+						string::remove_non_alphanumeric(filter_copy);
 
-						if (const auto skills = string::split(filterSkill, " "); !skills.empty()) {
-							RE::ActorValue av;
-							if (string::is_only_digit(skills[0])) {
-								av = string::to_num<RE::ActorValue>(skills[0]);
-							} else {
-								av = RE::ActorValueList::GetSingleton()->LookupActorValueByName(skills[0]);
-							}
-							const auto minLevel = string::to_num<std::uint8_t>(skills[1]);
-
-							if (a_actor->GetActorValue(av) < minLevel) {
-								a_params.restrictReason = RESTRICT_REASON::kSkill;
-								return true;
-							}
+						const auto     skills = string::split(filter_copy, " ");
+						RE::ActorValue av;
+						if (string::is_only_digit(skills[0])) {
+							av = string::to_num<RE::ActorValue>(skills[0]);
+						} else {
+							av = RE::ActorValueList::GetSingleton()->LookupActorValueByName(skills[0]);
 						}
+						const auto minLevel = string::to_num<float>(skills[1]);
+
+						if (a_actor->GetActorValue(av) >= minLevel) {
+							return true;
+						}
+						a_params.restrictReason = RESTRICT_REASON::kSkill;
 						return false;
 					}
 
-					if (const auto filterForm = RE::TESForm::LookupByEditorID(a_filter)) {
+					bool match;
+
+					if (const auto filterForm = RE::TESForm::LookupByEditorID(filter_copy)) {
 						switch (filterForm->GetFormType()) {
 						case RE::FormType::Faction:
 							{
-								const auto faction = filterForm->As<RE::TESFaction>();
-								return faction && a_actor->IsInFaction(faction);
+								match = a_actor->IsInFaction(filterForm->As<RE::TESFaction>());
+								return invert ? !match : match;
 							}
 						case RE::FormType::Perk:
 							{
-								const auto perk = filterForm->As<RE::BGSPerk>();
-								return perk && a_actor->HasPerk(perk);
+								match = a_actor->HasPerk(filterForm->As<RE::BGSPerk>());
+								return invert ? !match : match;
 							}
 						case RE::FormType::Race:
-							return a_actor->GetRace() == filterForm;
+							{
+								match = a_actor->GetRace() == filterForm;
+								return invert ? !match : match;
+							}
 						default:
 							break;
 						}
 					}
 
-					return a_actor->HasKeywordString(a_filter) || std::ranges::any_of(edids, [&](const auto& edid) { return string::iequals(edid, a_filter); });
+					match = a_actor->HasKeywordString(filter_copy) || std::ranges::any_of(edids, [&](const auto& edid) { return string::iequals(edid, a_filter); });
+					return invert ? !match : match;
 				}
 			}
-		});
+		};
+
+		const auto split_filters = string::split(restrict_kywd[1], ",");
+		bool       shouldSkip = std::ranges::none_of(split_filters, [&](const std::string& a_filter) {
+            if (a_filter.contains('+')) {
+                const auto chained_filters = string::split(a_filter, "+");
+                return std::ranges::all_of(split_filters, match_filter);
+            } else {
+                return match_filter(a_filter);
+            }
+        });
 
 		return { shouldSkip, restrict_kywd.size() > 2 ? RE::TESForm::LookupByEditorID<RE::BGSPerk>(restrict_kywd[2]) : nullptr };
 	}
