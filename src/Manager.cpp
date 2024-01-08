@@ -141,7 +141,7 @@ namespace ItemRestrictor
 		bool       shouldSkip = std::ranges::none_of(split_filters, [&](const std::string& a_filter) {
             if (a_filter.contains('+')) {
                 const auto chained_filters = string::split(a_filter, "+");
-                return std::ranges::all_of(split_filters, match_filter);
+				return std::ranges::all_of(chained_filters, match_filter);
             } else {
                 return match_filter(a_filter);
             }
