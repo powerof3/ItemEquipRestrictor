@@ -259,7 +259,7 @@ namespace ItemRestrictor
 					if (auto [skipEquip, debuffPerk] = Manager::ShouldSkip(a_actor, a_object, params); skipEquip) {
 						if (a_actor->IsPlayerRef()) {
 							const auto notification = Settings::GetSingleton()->GetNotification(a_object, params);
-							if (!notification.empty()) {
+							if (a_objectEquipParams.showMessage && !notification.empty()) {
 								RE::DebugNotification(notification.c_str());
 							}
 						}
