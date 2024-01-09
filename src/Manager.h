@@ -40,14 +40,16 @@ namespace ItemRestrictor
 		static void AddAnimationEvent(const RE::Actor* a_actor);
 		static void RemoveAnimationEvent(const RE::Actor* a_actor);
 
-		static std::pair<bool, RE::BGSPerk*> ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, RE::TESBoundObject* a_object, RestrictParams& a_params);
+		static std::pair<bool, RE::BGSPerk*> ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params);
 		static std::pair<bool, RE::BGSPerk*> ShouldSkip(RE::Actor* a_actor, RE::TESBoundObject* a_object, RestrictParams& a_params);
 
 		void AddDebuffPerk(const RE::TESBoundObject* a_item, RE::BGSPerk* a_perk);
 		void RemoveDebuffPerk(const RE::TESBoundObject* a_item);
 
 	private:
-		static void ProcessShouldSkipCast(RE::Actor* a_actor, RE::MagicCaster* a_caster);
+		static void get_npc_edids(RE::Actor* a_actor, const RE::TESNPC* a_npc, std::vector<std::string>& a_edids);
+
+	    static void ProcessShouldSkipCast(RE::Actor* a_actor, RE::MagicCaster* a_caster);
 
 		RE::BSEventNotifyControl ProcessEvent(RE::TESEquipEvent const* a_evn, RE::BSTEventSource<RE::TESEquipEvent>*) override;
 		RE::BSEventNotifyControl ProcessEvent(RE::TESObjectLoadedEvent const* a_evn, RE::BSTEventSource<RE::TESObjectLoadedEvent>*) override;

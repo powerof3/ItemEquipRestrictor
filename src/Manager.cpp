@@ -22,7 +22,21 @@ namespace ItemRestrictor
 		a_actor->RemoveAnimationGraphEventSink(GetSingleton());
 	}
 
-	std::pair<bool, RE::BGSPerk*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, RE::TESBoundObject* a_object, RestrictParams& a_params)
+    void Manager::get_npc_edids(RE::Actor* a_actor, const RE::TESNPC* a_npc, std::vector<std::string>& a_edids)
+	{
+		if (const auto extraLvlCreature = a_actor->extraList.GetByType<RE::ExtraLeveledCreature>()) {
+			if (const auto originalBase = extraLvlCreature->originalBase) {
+				a_edids.emplace_back(edid::get_editorID(originalBase));
+			}
+			if (const auto templateBase = extraLvlCreature->templateBase) {
+				a_edids.emplace_back(edid::get_editorID(templateBase));
+			}
+		} else {
+			a_edids.emplace_back(edid::get_editorID(a_npc));
+		}
+	}
+
+	std::pair<bool, RE::BGSPerk*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params)
 	{
 		if (a_params.restrictOn == RESTRICT_ON::kEquip && !a_keywordEDID.starts_with("RestrictEquip:") || a_params.restrictOn == RESTRICT_ON::kCast && !a_keywordEDID.starts_with("RestrictCast:")) {
 			return { false, nullptr };
@@ -40,16 +54,29 @@ namespace ItemRestrictor
 		const auto actorLevel = a_npc->GetLevel();
 
 		std::vector<std::string> edids{};
-		if (const auto extraLvlCreature = a_actor->extraList.GetByType<RE::ExtraLeveledCreature>()) {
-			if (const auto originalBase = extraLvlCreature->originalBase) {
-				edids.emplace_back(edid::get_editorID(originalBase));
+		get_npc_edids(a_actor, a_npc, edids);
+
+		const auto isAmmo = a_object->IsAmmo();
+		const auto lHand = a_actor->GetEquippedObject(true);
+		const auto rHand = a_actor->GetEquippedObject(false);
+
+		const auto match_keywords = [&](const std::string& a_filter) {
+			if (a_actor->HasKeywordString(a_filter)) {
+				return true;
 			}
-			if (const auto templateBase = extraLvlCreature->templateBase) {
-				edids.emplace_back(edid::get_editorID(templateBase));
+			if (isAmmo) {
+				if (rHand && rHand->HasKeywordByEditorID(a_filter)) {
+					return true;
+				}
+				if (lHand && lHand->HasKeywordByEditorID(a_filter)) {
+					return true;
+				}
 			}
-		} else {
-			edids.emplace_back(edid::get_editorID(a_npc));
-		}
+			if (std::ranges::any_of(edids, [&](const auto& edid) { return string::iequals(edid, a_filter); })) {
+				return true;
+			}
+			return false;
+		};
 
 		const auto match_filter = [&](const std::string& a_filter) {
 			// RestrictEquip:Female -> men cannot wear this
@@ -80,7 +107,7 @@ namespace ItemRestrictor
 					if (filter_copy.starts_with("Level(")) {
 						static srell::regex pattern(R"(\(([^)]+)\))");
 						if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
-						    std::uint16_t level;
+							std::uint16_t level;
 							if (string::is_only_digit(matches[1].str())) {
 								level = string::to_num<std::uint16_t>(matches[1].str());
 							} else {
@@ -143,7 +170,7 @@ namespace ItemRestrictor
 						}
 					}
 
-					match = a_actor->HasKeywordString(filter_copy) || std::ranges::any_of(edids, [&](const auto& edid) { return string::iequals(edid, a_filter); });
+					match = match_keywords(filter_copy);
 					return invert ? !match : match;
 				}
 			}
@@ -202,7 +229,7 @@ namespace ItemRestrictor
 		}
 	}
 
-	void Manager::ProcessShouldSkipCast(RE::Actor* a_actor, RE::MagicCaster* a_caster)
+    void Manager::ProcessShouldSkipCast(RE::Actor* a_actor, RE::MagicCaster* a_caster)
 	{
 		if (!a_caster || !a_caster->currentSpell) {
 			return;
