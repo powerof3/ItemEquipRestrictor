@@ -11,6 +11,7 @@
 #	include <spdlog/sinks/msvc_sink.h>
 #endif
 #include <xbyak/xbyak.h>
+#include <srell.hpp>
 
 #include "ClibUtil/editorID.hpp"
 #include "ClibUtil/simpleINI.hpp"

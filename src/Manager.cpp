@@ -78,32 +78,44 @@ namespace ItemRestrictor
 			default:
 				{
 					if (filter_copy.starts_with("Level(")) {
-						string::remove_non_numeric(filter_copy);
-
-						const auto level = string::to_num<std::uint16_t>(filter_copy);
-						if (actorLevel >= level) {
-							return true;
+						static srell::regex pattern(R"(\(([^)]+)\))");
+						if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
+						    std::uint16_t level;
+							if (string::is_only_digit(matches[1].str())) {
+								level = string::to_num<std::uint16_t>(matches[1].str());
+							} else {
+								level = static_cast<std::uint16_t>(RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[1].str())->value);
+							}
+							if (actorLevel >= level) {
+								return true;
+							}
+							a_params.restrictReason = RESTRICT_REASON::kLevel;
 						}
-						a_params.restrictReason = RESTRICT_REASON::kLevel;
 						return false;
 					}
 
 					if (filter_copy.contains("(")) {
-						string::remove_non_alphanumeric(filter_copy);
+						static srell::regex pattern(R"(([^\(]*)\(([^)]+)\))");
+						if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
+							RE::ActorValue av;
+							float          minLevel;
 
-						const auto     skills = string::split(filter_copy, " ");
-						RE::ActorValue av;
-						if (string::is_only_digit(skills[0])) {
-							av = string::to_num<RE::ActorValue>(skills[0]);
-						} else {
-							av = RE::ActorValueList::GetSingleton()->LookupActorValueByName(skills[0]);
-						}
-						const auto minLevel = string::to_num<float>(skills[1]);
+							if (string::is_only_digit(matches[1].str())) {
+								av = string::to_num<RE::ActorValue>(matches[1].str());
+							} else {
+								av = RE::ActorValueList::GetSingleton()->LookupActorValueByName(matches[1].str());
+							}
+							if (string::is_only_digit(matches[2].str())) {
+								minLevel = string::to_num<float>(matches[2].str());
+							} else {
+								minLevel = RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[2].str())->value;
+							}
 
-						if (a_actor->GetActorValue(av) >= minLevel) {
-							return true;
+							if (a_actor->GetActorValue(av) >= minLevel) {
+								return true;
+							}
+							a_params.restrictReason = RESTRICT_REASON::kSkill;
 						}
-						a_params.restrictReason = RESTRICT_REASON::kSkill;
 						return false;
 					}
 
@@ -141,7 +153,7 @@ namespace ItemRestrictor
 		bool       shouldSkip = std::ranges::none_of(split_filters, [&](const std::string& a_filter) {
             if (a_filter.contains('+')) {
                 const auto chained_filters = string::split(a_filter, "+");
-				return std::ranges::all_of(chained_filters, match_filter);
+                return std::ranges::all_of(chained_filters, match_filter);
             } else {
                 return match_filter(a_filter);
             }
