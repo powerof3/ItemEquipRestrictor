@@ -48,6 +48,7 @@ namespace ItemRestrictor
 
 	private:
 		static void get_npc_edids(RE::Actor* a_actor, const RE::TESNPC* a_npc, std::vector<std::string>& a_edids);
+		static bool is_bow_or_crossbow(RE::TESForm* a_object);
 
 	    static void ProcessShouldSkipCast(RE::Actor* a_actor, RE::MagicCaster* a_caster);
 

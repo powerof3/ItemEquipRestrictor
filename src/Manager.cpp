@@ -36,7 +36,15 @@ namespace ItemRestrictor
 		}
 	}
 
-	std::pair<bool, RE::BGSPerk*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params)
+    bool Manager::is_bow_or_crossbow(RE::TESForm* a_object)
+	{
+		if (const auto weap = a_object->As<RE::TESObjectWEAP>(); weap && (weap->IsBow() || weap->IsCrossbow())) {
+			return true;
+		}
+		return false;
+	}
+
+    std::pair<bool, RE::BGSPerk*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params)
 	{
 		if (a_params.restrictOn == RESTRICT_ON::kEquip && !a_keywordEDID.starts_with("RestrictEquip:") || a_params.restrictOn == RESTRICT_ON::kCast && !a_keywordEDID.starts_with("RestrictCast:")) {
 			return { false, nullptr };
@@ -56,24 +64,25 @@ namespace ItemRestrictor
 		std::vector<std::string> edids{};
 		get_npc_edids(a_actor, a_npc, edids);
 
-		const auto isAmmo = a_object->IsAmmo();
 		const auto lHand = a_actor->GetEquippedObject(true);
 		const auto rHand = a_actor->GetEquippedObject(false);
+
+	    const auto isAmmo = a_object->IsAmmo();
+		const auto isLHandBow = isAmmo && lHand && is_bow_or_crossbow(lHand);
+		const auto isRHandBow = isAmmo && rHand && is_bow_or_crossbow(rHand);
 
 		const auto match_keywords = [&](const std::string& a_filter) {
 			if (a_actor->HasKeywordString(a_filter)) {
 				return true;
 			}
-			if (isAmmo) {
-				if (rHand && rHand->HasKeywordByEditorID(a_filter)) {
-					return true;
-				}
-				if (lHand && lHand->HasKeywordByEditorID(a_filter)) {
-					return true;
-				}
-			}
 			if (std::ranges::any_of(edids, [&](const auto& edid) { return string::iequals(edid, a_filter); })) {
 				return true;
+			}
+			if (isAmmo) {
+				if (!isLHandBow && !isRHandBow) {
+					return true;
+				}
+				return isRHandBow && rHand->HasKeywordByEditorID(a_filter) || isLHandBow && lHand->HasKeywordByEditorID(a_filter);
 			}
 			return false;
 		};
@@ -346,6 +355,16 @@ namespace ItemRestrictor
 				if (!notification.empty()) {
 					RE::DebugNotification(notification.c_str());
 				}
+			} else if (is_bow_or_crossbow(item)) {
+			    if (const auto    ammo = actor->GetCurrentAmmo()) {
+			        params.restrictType = RESTRICT_TYPE::kRestrict;
+			        if (std::tie(skipEquip, debuffPerk) = ShouldSkip(actor, ammo, params); skipEquip) {
+						SKSE::GetTaskInterface()->AddTask([actor, ammo]() {
+							RE::ActorEquipManager::GetSingleton()->UnequipObject(actor, ammo);
+							RE::SendUIMessage::SendInventoryUpdateMessage(actor, nullptr);
+						});
+					}
+			    }
 			}
 		} else {
 			RemoveDebuffPerk(item);
