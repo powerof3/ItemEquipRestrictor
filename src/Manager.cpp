@@ -71,6 +71,8 @@ namespace ItemRestrictor
 		const auto isLHandBow = isAmmo && lHand && is_bow_or_crossbow(lHand);
 		const auto isRHandBow = isAmmo && rHand && is_bow_or_crossbow(rHand);
 
+		const auto inCombat = a_actor->IsInCombat();
+
 		const auto match_keywords = [&](const std::string& a_filter) {
 			if (a_actor->HasKeywordString(a_filter)) {
 				return true;
@@ -111,6 +113,8 @@ namespace ItemRestrictor
 				return invert ? !isPlayer : isPlayer;
 			case "NPC"_h:
 				return invert ? isPlayer : !isPlayer;
+			case "Combat"_h:
+				return invert ? inCombat : !inCombat;
 			default:
 				{
 					if (filter_copy.starts_with("Level(")) {
@@ -122,7 +126,7 @@ namespace ItemRestrictor
 							} else {
 								level = static_cast<std::uint16_t>(RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[1].str())->value);
 							}
-							if (actorLevel >= level) {
+							if (const auto match = actorLevel >= level; invert ? !match : match) {
 								return true;
 							}
 							a_params.restrictReason = RESTRICT_REASON::kLevel;
@@ -147,7 +151,7 @@ namespace ItemRestrictor
 								minLevel = RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[2].str())->value;
 							}
 
-							if (a_actor->GetActorValue(av) >= minLevel) {
+                            if (const bool match = a_actor->GetActorValue(av) >= minLevel; invert ? !match : match) {
 								return true;
 							}
 							a_params.restrictReason = RESTRICT_REASON::kSkill;
