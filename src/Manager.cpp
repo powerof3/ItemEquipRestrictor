@@ -22,7 +22,7 @@ namespace ItemRestrictor
 		a_actor->RemoveAnimationGraphEventSink(GetSingleton());
 	}
 
-    void Manager::get_npc_edids(RE::Actor* a_actor, const RE::TESNPC* a_npc, std::vector<std::string>& a_edids)
+	void Manager::get_npc_edids(RE::Actor* a_actor, const RE::TESNPC* a_npc, std::vector<std::string>& a_edids)
 	{
 		if (const auto extraLvlCreature = a_actor->extraList.GetByType<RE::ExtraLeveledCreature>()) {
 			if (const auto originalBase = extraLvlCreature->originalBase) {
@@ -36,7 +36,7 @@ namespace ItemRestrictor
 		}
 	}
 
-    bool Manager::is_bow_or_crossbow(RE::TESForm* a_object)
+	bool Manager::is_bow_or_crossbow(RE::TESForm* a_object)
 	{
 		if (const auto weap = a_object->As<RE::TESObjectWEAP>(); weap && (weap->IsBow() || weap->IsCrossbow())) {
 			return true;
@@ -44,7 +44,7 @@ namespace ItemRestrictor
 		return false;
 	}
 
-    std::pair<bool, RE::BGSPerk*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params)
+	std::pair<bool, RE::BGSPerk*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params)
 	{
 		if (a_params.restrictOn == RESTRICT_ON::kEquip && !a_keywordEDID.starts_with("RestrictEquip:") || a_params.restrictOn == RESTRICT_ON::kCast && !a_keywordEDID.starts_with("RestrictCast:")) {
 			return { false, nullptr };
@@ -60,24 +60,16 @@ namespace ItemRestrictor
 
 		const auto sex = a_npc->GetSex();
 		const auto actorLevel = a_npc->GetLevel();
-
-		std::vector<std::string> edids{};
-		get_npc_edids(a_actor, a_npc, edids);
-
 		const auto lHand = a_actor->GetEquippedObject(true);
 		const auto rHand = a_actor->GetEquippedObject(false);
-
-	    const auto isAmmo = a_object->IsAmmo();
+		const auto isAmmo = a_object->IsAmmo();
 		const auto isLHandBow = isAmmo && lHand && is_bow_or_crossbow(lHand);
 		const auto isRHandBow = isAmmo && rHand && is_bow_or_crossbow(rHand);
-
 		const auto inCombat = a_actor->IsInCombat();
+		const auto inventory = a_actor->GetInventory();
 
 		const auto match_keywords = [&](const std::string& a_filter) {
 			if (a_actor->HasKeywordString(a_filter)) {
-				return true;
-			}
-			if (std::ranges::any_of(edids, [&](const auto& edid) { return string::iequals(edid, a_filter); })) {
 				return true;
 			}
 			if (isAmmo) {
@@ -85,6 +77,12 @@ namespace ItemRestrictor
 					return true;
 				}
 				return isRHandBow && rHand->HasKeywordByEditorID(a_filter) || isLHandBow && lHand->HasKeywordByEditorID(a_filter);
+			}
+			for (auto& [item, data] : inventory) {
+				auto& [count, entry] = data;
+				if (entry->IsWorn() && count > 0 && item->HasKeywordByEditorID(a_filter)) {
+					return true;
+				}
 			}
 			return false;
 		};
@@ -151,7 +149,7 @@ namespace ItemRestrictor
 								minLevel = RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[2].str())->value;
 							}
 
-                            if (const bool match = a_actor->GetActorValue(av) >= minLevel; invert ? !match : match) {
+							if (const bool match = a_actor->GetActorValue(av) >= minLevel; invert ? !match : match) {
 								return true;
 							}
 							a_params.restrictReason = RESTRICT_REASON::kSkill;
@@ -242,7 +240,7 @@ namespace ItemRestrictor
 		}
 	}
 
-    void Manager::ProcessShouldSkipCast(RE::Actor* a_actor, RE::MagicCaster* a_caster)
+	void Manager::ProcessShouldSkipCast(RE::Actor* a_actor, RE::MagicCaster* a_caster)
 	{
 		if (!a_caster || !a_caster->currentSpell) {
 			return;
@@ -360,15 +358,15 @@ namespace ItemRestrictor
 					RE::DebugNotification(notification.c_str());
 				}
 			} else if (is_bow_or_crossbow(item)) {
-			    if (const auto    ammo = actor->GetCurrentAmmo()) {
-			        params.restrictType = RESTRICT_TYPE::kRestrict;
-			        if (std::tie(skipEquip, debuffPerk) = ShouldSkip(actor, ammo, params); skipEquip) {
+				if (const auto ammo = actor->GetCurrentAmmo()) {
+					params.restrictType = RESTRICT_TYPE::kRestrict;
+					if (std::tie(skipEquip, debuffPerk) = ShouldSkip(actor, ammo, params); skipEquip) {
 						SKSE::GetTaskInterface()->AddTask([actor, ammo]() {
 							RE::ActorEquipManager::GetSingleton()->UnequipObject(actor, ammo);
 							RE::SendUIMessage::SendInventoryUpdateMessage(actor, nullptr);
 						});
 					}
-			    }
+				}
 			}
 		} else {
 			RemoveDebuffPerk(item);
