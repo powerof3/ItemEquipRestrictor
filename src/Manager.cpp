@@ -212,8 +212,10 @@ namespace ItemRestrictor
 
 		if (const auto keywordForm = a_object->As<RE::BGSKeywordForm>()) {
 			keywordForm->ForEachKeyword([&](const RE::BGSKeyword& a_keyword) {
-				if (std::tie(skipEquip, debuffPerk) = ShouldSkip(a_keyword.GetFormEditorID(), a_actor, base, a_object, a_params); skipEquip) {
-					return RE::BSContainer::ForEachResult::kStop;
+				if (const auto edid = a_keyword.GetFormEditorID(); !string::is_empty(edid)) {
+					if (std::tie(skipEquip, debuffPerk) = ShouldSkip(edid, a_actor, base, a_object, a_params); skipEquip) {
+						return RE::BSContainer::ForEachResult::kStop;
+					}
 				}
 				return RE::BSContainer::ForEachResult::kContinue;
 			});
