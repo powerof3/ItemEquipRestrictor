@@ -40,11 +40,11 @@ namespace ItemRestrictor
 		static void AddAnimationEvent(const RE::Actor* a_actor);
 		static void RemoveAnimationEvent(const RE::Actor* a_actor);
 
-		static std::pair<bool, RE::BGSPerk*> ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params);
-		static std::pair<bool, RE::BGSPerk*> ShouldSkip(RE::Actor* a_actor, RE::TESBoundObject* a_object, RestrictParams& a_params);
+		static std::pair<bool, RE::TESForm*> ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params);
+		static std::pair<bool, RE::TESForm*> ShouldSkip(RE::Actor* a_actor, RE::TESBoundObject* a_object, RestrictParams& a_params);
 
-		void AddDebuffPerk(const RE::TESBoundObject* a_item, RE::BGSPerk* a_perk);
-		void RemoveDebuffPerk(const RE::TESBoundObject* a_item);
+		void AddDebuff(const RE::TESBoundObject* a_item, RE::TESForm* a_debuffForm);
+		void RemoveDebuff(const RE::TESBoundObject* a_item);
 
 	private:
 		static void get_npc_edids(RE::Actor* a_actor, const RE::TESNPC* a_npc, std::vector<std::string>& a_edids);
@@ -58,7 +58,8 @@ namespace ItemRestrictor
 		RE::BSEventNotifyControl ProcessEvent(RE::BSAnimationGraphEvent const* a_evn, RE::BSTEventSource<RE::BSAnimationGraphEvent>*) override;
 
 		// members
-		std::unordered_map<RE::FormID, std::unordered_set<RE::FormID>> _debuffPerkMap{};
+		std::unordered_map<RE::FormID, std::unordered_set<RE::FormID>> _objectDebuffsMap{};
+		std::unordered_map<RE::FormID, std::unordered_set<RE::FormID>> _debuffObjectsMap{};
 	};
 
 	void Install();

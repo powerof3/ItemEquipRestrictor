@@ -44,7 +44,7 @@ namespace ItemRestrictor
 		return false;
 	}
 
-	std::pair<bool, RE::BGSPerk*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params)
+	std::pair<bool, RE::TESForm*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params)
 	{
 		if (a_params.restrictOn == RESTRICT_ON::kEquip && !a_keywordEDID.starts_with("RestrictEquip:") || a_params.restrictOn == RESTRICT_ON::kCast && !a_keywordEDID.starts_with("RestrictCast:")) {
 			return { false, nullptr };
@@ -197,23 +197,23 @@ namespace ItemRestrictor
             }
         });
 
-		return { shouldSkip, restrict_kywd.size() > 2 ? RE::TESForm::LookupByEditorID<RE::BGSPerk>(restrict_kywd[2]) : nullptr };
+		return { shouldSkip, restrict_kywd.size() > 2 ? RE::TESForm::LookupByEditorID(restrict_kywd[2]) : nullptr };
 	}
 
-	std::pair<bool, RE::BGSPerk*> Manager::ShouldSkip(RE::Actor* a_actor, RE::TESBoundObject* a_object, RestrictParams& a_params)
+	std::pair<bool, RE::TESForm*> Manager::ShouldSkip(RE::Actor* a_actor, RE::TESBoundObject* a_object, RestrictParams& a_params)
 	{
 		bool         skipEquip = false;
-		RE::BGSPerk* debuffPerk = nullptr;
+		RE::TESForm* debuffForm = nullptr;
 
 		const auto base = a_actor->GetActorBase();
 		if (!base) {
-			return { skipEquip, debuffPerk };
+			return { skipEquip, debuffForm };
 		}
 
 		if (const auto keywordForm = a_object->As<RE::BGSKeywordForm>()) {
 			keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
 				if (const auto edid = a_keyword->GetFormEditorID(); !string::is_empty(edid)) {
-					if (std::tie(skipEquip, debuffPerk) = ShouldSkip(edid, a_actor, base, a_object, a_params); skipEquip) {
+					if (std::tie(skipEquip, debuffForm) = ShouldSkip(edid, a_actor, base, a_object, a_params); skipEquip) {
 						return RE::BSContainer::ForEachResult::kStop;
 					}
 				}
@@ -221,24 +221,40 @@ namespace ItemRestrictor
 			});
 		}
 
-		return { skipEquip, debuffPerk };
+		return { skipEquip, debuffForm };
 	}
 
-	void Manager::AddDebuffPerk(const RE::TESBoundObject* a_item, RE::BGSPerk* a_perk)
+	void Manager::AddDebuff(const RE::TESBoundObject* a_item, RE::TESForm* a_debuffForm)
 	{
-		RE::PlayerCharacter::GetSingleton()->AddPerk(a_perk);
-		_debuffPerkMap[a_item->GetFormID()].insert(a_perk->GetFormID());
+		if (a_debuffForm->Is(RE::FormType::Perk)) {
+			RE::PlayerCharacter::GetSingleton()->AddPerk(a_debuffForm->As<RE::BGSPerk>());
+		} else {
+			RE::PlayerCharacter::GetSingleton()->AddSpell(a_debuffForm->As<RE::SpellItem>());
+		}
+
+		_objectDebuffsMap[a_item->GetFormID()].insert(a_debuffForm->GetFormID());
+		_debuffObjectsMap[a_debuffForm->GetFormID()].insert(a_item->GetFormID());
 	}
 
-	void Manager::RemoveDebuffPerk(const RE::TESBoundObject* a_item)
+	void Manager::RemoveDebuff(const RE::TESBoundObject* a_item)
 	{
-		if (const auto it = _debuffPerkMap.find(a_item->GetFormID()); it != _debuffPerkMap.end()) {
-			for (const auto& perkID : it->second) {
-				if (const auto perk = RE::TESForm::LookupByID<RE::BGSPerk>(perkID)) {
-					RE::PlayerCharacter::GetSingleton()->RemovePerk(perk);
+		const auto itemID = a_item->GetFormID();
+
+		if (const auto oIt = _objectDebuffsMap.find(itemID); oIt != _objectDebuffsMap.end()) {
+			for (const auto& debuffID : oIt->second) {
+				if (const auto dIt = _debuffObjectsMap.find(debuffID); dIt != _debuffObjectsMap.end()) {
+					if (dIt->second.erase(itemID) && dIt->second.empty()) {
+						if (const auto debuffForm = RE::TESForm::LookupByID(debuffID)) {
+							if (debuffForm->Is(RE::FormType::Perk)) {
+								RE::PlayerCharacter::GetSingleton()->RemovePerk(debuffForm->As<RE::BGSPerk>());
+							} else {
+								RE::PlayerCharacter::GetSingleton()->RemoveSpell(debuffForm->As<RE::SpellItem>());
+							}
+						}
+					}
 				}
 			}
-			_debuffPerkMap.erase(it);
+			_objectDebuffsMap.erase(oIt);
 		}
 	}
 
@@ -252,7 +268,7 @@ namespace ItemRestrictor
 			RESTRICT_TYPE::kRestrict,
 			RESTRICT_REASON::kGeneric
 		};
-		if (auto [skipEquip, debuffPerk] = ShouldSkip(a_actor, a_caster->currentSpell, params); skipEquip) {
+		if (auto [skipEquip, debuffForm] = ShouldSkip(a_actor, a_caster->currentSpell, params); skipEquip) {
 			if (a_actor->IsPlayerRef()) {
 				const auto notification = Settings::GetSingleton()->GetNotification(a_caster->currentSpell, params);
 				if (!notification.empty()) {
@@ -277,7 +293,7 @@ namespace ItemRestrictor
 							RESTRICT_TYPE::kRestrict,
 							RESTRICT_REASON::kGeneric
 						};
-						if (auto [skipEquip, debuffPerk] = Manager::ShouldSkip(a_actor, a_object, params); skipEquip) {
+						if (auto [skipEquip, debuffForm] = Manager::ShouldSkip(a_actor, a_object, params); skipEquip) {
 							if (a_actor->IsPlayerRef()) {
 								const auto notification = Settings::GetSingleton()->GetNotification(a_object, params);
 								if (a_objectEquipParams.showMessage && !notification.empty()) {
@@ -326,8 +342,8 @@ namespace ItemRestrictor
 
 		if (a_evn->equipped) {
 			RestrictParams params{ RESTRICT_ON::kEquip, RESTRICT_TYPE::kDebuff, RESTRICT_REASON::kGeneric };
-			if (auto [skipEquip, debuffPerk] = ShouldSkip(actor, item, params); skipEquip && debuffPerk) {
-				AddDebuffPerk(item, debuffPerk);
+			if (auto [skipEquip, debuffForm] = ShouldSkip(actor, item, params); skipEquip && debuffForm) {
+				AddDebuff(item, debuffForm);
 				const auto notification = Settings::GetSingleton()->GetNotification(item, params);
 				if (!notification.empty()) {
 					RE::DebugNotification(notification.c_str());
@@ -335,7 +351,7 @@ namespace ItemRestrictor
 			} else if (is_bow_or_crossbow(item)) {
 				if (const auto ammo = actor->GetCurrentAmmo()) {
 					params.restrictType = RESTRICT_TYPE::kRestrict;
-					if (std::tie(skipEquip, debuffPerk) = ShouldSkip(actor, ammo, params); skipEquip) {
+					if (std::tie(skipEquip, debuffForm) = ShouldSkip(actor, ammo, params); skipEquip) {
 						SKSE::GetTaskInterface()->AddTask([actor, ammo]() {
 							RE::ActorEquipManager::GetSingleton()->UnequipObject(actor, ammo);
 							RE::SendUIMessage::SendInventoryUpdateMessage(actor, nullptr);
@@ -344,7 +360,7 @@ namespace ItemRestrictor
 				}
 			}
 		} else {
-			RemoveDebuffPerk(item);
+			RemoveDebuff(item);
 		}
 
 		return RE::BSEventNotifyControl::kContinue;
