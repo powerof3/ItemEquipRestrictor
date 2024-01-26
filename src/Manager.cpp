@@ -422,7 +422,7 @@ namespace ItemRestrictor
 			ProcessShouldSkipCast(actor, actor->magicCasters[1]);
 			break;
 		case "BeginCastVoice"_h:
-			ProcessShouldSkipCast(actor, actor->magicCasters[2]);
+			ProcessShouldSkipCast(actor, actor->magicCasters[3]);
 			break;
 		default:
 			break;
