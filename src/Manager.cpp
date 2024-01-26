@@ -211,8 +211,8 @@ namespace ItemRestrictor
 		}
 
 		if (const auto keywordForm = a_object->As<RE::BGSKeywordForm>()) {
-			keywordForm->ForEachKeyword([&](const RE::BGSKeyword& a_keyword) {
-				if (const auto edid = a_keyword.GetFormEditorID(); !string::is_empty(edid)) {
+			keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
+				if (const auto edid = a_keyword->GetFormEditorID(); !string::is_empty(edid)) {
 					if (std::tie(skipEquip, debuffPerk) = ShouldSkip(edid, a_actor, base, a_object, a_params); skipEquip) {
 						return RE::BSContainer::ForEachResult::kStop;
 					}
@@ -247,8 +247,11 @@ namespace ItemRestrictor
 		if (!a_caster || !a_caster->currentSpell) {
 			return;
 		}
-
-		RestrictParams params{ RESTRICT_ON::kCast, RESTRICT_TYPE::kRestrict, RESTRICT_REASON::kGeneric };
+		RestrictParams params{
+			RESTRICT_ON::kCast,
+			RESTRICT_TYPE::kRestrict,
+			RESTRICT_REASON::kGeneric
+		};
 		if (auto [skipEquip, debuffPerk] = ShouldSkip(a_actor, a_caster->currentSpell, params); skipEquip) {
 			if (a_actor->IsPlayerRef()) {
 				const auto notification = Settings::GetSingleton()->GetNotification(a_caster->currentSpell, params);
@@ -268,15 +271,21 @@ namespace ItemRestrictor
 			static void thunk(RE::ActorEquipManager* a_manager, RE::Actor* a_actor, RE::TESBoundObject* a_object, const RE::ObjectEquipParams& a_objectEquipParams)
 			{
 				if (a_actor && a_object && !a_objectEquipParams.forceEquip) {
-					RestrictParams params{ RESTRICT_ON::kEquip, RESTRICT_TYPE::kRestrict, RESTRICT_REASON::kGeneric };
-					if (auto [skipEquip, debuffPerk] = Manager::ShouldSkip(a_actor, a_object, params); skipEquip) {
-						if (a_actor->IsPlayerRef()) {
-							const auto notification = Settings::GetSingleton()->GetNotification(a_object, params);
-							if (a_objectEquipParams.showMessage && !notification.empty()) {
-								RE::DebugNotification(notification.c_str());
+					if (!a_objectEquipParams.extraDataList || !a_objectEquipParams.extraDataList->HasQuestObjectAlias()) {
+						RestrictParams params{
+							RESTRICT_ON::kEquip,
+							RESTRICT_TYPE::kRestrict,
+							RESTRICT_REASON::kGeneric
+						};
+						if (auto [skipEquip, debuffPerk] = Manager::ShouldSkip(a_actor, a_object, params); skipEquip) {
+							if (a_actor->IsPlayerRef()) {
+								const auto notification = Settings::GetSingleton()->GetNotification(a_object, params);
+								if (a_objectEquipParams.showMessage && !notification.empty()) {
+									RE::DebugNotification(notification.c_str());
+								}
 							}
+							return;
 						}
-						return;
 					}
 				}
 
@@ -295,42 +304,6 @@ namespace ItemRestrictor
 			for (const auto& [id, offset] : targets) {
 				REL::Relocation<std::uintptr_t> target{ id, offset };
 				stl::write_thunk_call<DoEquip>(target.address());
-			}
-		}
-	}
-
-	namespace Unequip
-	{
-		struct DoUnequip
-		{
-			static void thunk(RE::ActorEquipManager* a_manager, RE::Actor* a_actor, RE::TESBoundObject* a_object, const RE::ObjectEquipParams& a_objectEquipParams)
-			{
-				RestrictParams params{ RESTRICT_ON::kEquip, RESTRICT_TYPE::kRestrict, RESTRICT_REASON::kGeneric };
-				if (auto [skipEquip, debuffPerk] = Manager::ShouldSkip(a_actor, a_object, params); skipEquip) {
-					if (a_actor->IsPlayerRef()) {
-						const auto notification = Settings::GetSingleton()->GetNotification(a_object, params);
-						if (!notification.empty()) {
-							RE::DebugNotification(notification.c_str());
-						}
-					}
-					return;
-				}
-
-				return func(a_manager, a_actor, a_object, a_objectEquipParams);
-			}
-			static inline REL::Relocation<decltype(thunk)> func;
-		};
-
-		void Install()
-		{
-			std::array targets{
-				std::make_pair(RELOCATION_ID(37938, 38894), OFFSET(0xE5, 0x170)),  //ActorEquipManager::EquipObject
-				std::make_pair(RELOCATION_ID(37937, 38893), 0xBC),                 //ActorEquipManager::EquipImpl?
-			};
-
-			for (const auto& [id, offset] : targets) {
-				REL::Relocation<std::uintptr_t> target{ id, offset };
-				stl::write_thunk_call<DoUnequip>(target.address());
 			}
 		}
 	}
@@ -437,6 +410,5 @@ namespace ItemRestrictor
 		Manager::Register();
 
 		Equip::Install();
-		//Unequip::Install();
 	}
 }
