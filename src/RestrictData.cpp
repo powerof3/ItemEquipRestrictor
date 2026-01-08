@@ -220,11 +220,11 @@ RestrictResult RestrictFilter::MatchFilter(const RestrictData& a_data, RestrictP
 	result.debuffForm = debuffForm;
 
 	if (!filtersALL.empty()) {
-		result.shouldSkip = std::ranges::none_of(filtersALL, [&](const auto& filterGroup) {
+		result.shouldSkip = !filtersALL.empty() && std::ranges::none_of(filtersALL, [&](const auto& filterGroup) {
 			return filterGroup.MatchFilter(a_data, a_params);
 		});
 	}
-	if (!result.shouldSkip && !filtersANY.empty()) {
+	if (!filtersANY.empty()) {
 		result.shouldSkip = std::ranges::none_of(filtersANY, [&](const auto& filter) {
 			return filter.MatchFilter(a_data, a_params);
 		});
