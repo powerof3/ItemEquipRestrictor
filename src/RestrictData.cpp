@@ -144,6 +144,18 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 							   result = invertFilter ? !match : match;
 						   }
 						   break;
+					   case RE::FormType::Spell:
+						   {
+							   bool match = a_data.actor->HasSpell(a_form->As<RE::SpellItem>());
+							   result = invertFilter ? !match : match;
+						   }
+						   break;
+					   case RE::FormType::MagicEffect:
+						   {
+							   bool match = a_data.actor->HasMagicEffect(a_form->As<RE::EffectSetting>());
+							   result = invertFilter ? !match : match;
+						   }
+						   break;
 					   default:
 						   break;
 					   }
