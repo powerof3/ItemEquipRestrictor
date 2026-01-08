@@ -31,7 +31,7 @@ RestrictFilter::Filter::Filter(const std::string& a_filter)
 			if (filter_copy.starts_with("Level(")) {
 				static srell::regex pattern(R"(\(([^)]+)\))");
 				if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
-					Level level;
+					ShortOrGlobal level;
 					if (string::is_only_digit(matches[1].str())) {
 						level = string::to_num<std::uint16_t>(matches[1].str());
 					} else {
@@ -43,18 +43,22 @@ RestrictFilter::Filter::Filter(const std::string& a_filter)
 			} else if (filter_copy.contains("(")) {
 				static srell::regex pattern(R"(([^\(]*)\(([^)]+)\))");
 				if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
-					std::pair<RE::ActorValue, ActorValueLevel> avLevel;
-					if (string::is_only_digit(matches[1].str())) {
-						avLevel.first = string::to_num<RE::ActorValue>(matches[1].str());
+					std::pair<FactionOrAV, FloatOrGlobal> factionOrAV;
+					const auto&                           first = matches[1].str();
+					const auto&                           second = matches[2].str();
+					if (string::is_only_digit(first)) {
+						factionOrAV.first = string::to_num<RE::ActorValue>(first);
+					} else if (const auto faction = RE::TESForm::LookupByEditorID<RE::TESFaction>(first)) {
+						factionOrAV.first = faction;
 					} else {
-						avLevel.first = RE::ActorValueList::GetSingleton()->LookupActorValueByName(matches[1].str().c_str());
+						factionOrAV.first = RE::ActorValueList::GetSingleton()->LookupActorValueByName(first.c_str());
 					}
-					if (string::is_only_digit(matches[2].str())) {
-						avLevel.second = string::to_num<float>(matches[2].str());
+					if (string::is_only_digit(second)) {
+						factionOrAV.second = string::to_num<float>(second);
 					} else {
-						avLevel.second = RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[2].str());
+						factionOrAV.second = RE::TESForm::LookupByEditorID<RE::TESGlobal>(second);
 					}
-					filter = avLevel;
+					filter = factionOrAV;
 				}
 			} else if (const auto filterForm = RE::TESForm::LookupByEditorID(filter_copy); filterForm && filterForm->IsNot(RE::FormType::Keyword)) {
 				filter = filterForm;
@@ -91,7 +95,7 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 						   break;
 					   }
 				   },
-				   [&](const Level& a_level) {
+				   [&](const ShortOrGlobal& a_level) {
 					   std::uint16_t level;
 					   std::visit(overload{
 									  [&](std::uint16_t b_level) {
@@ -107,7 +111,7 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 					   }
 					   a_params.restrictReason = RESTRICT_REASON::kLevel;
 				   },
-				   [&](const std::pair<RE::ActorValue, ActorValueLevel>& a_level) {
+				   [&](const std::pair<FactionOrAV, FloatOrGlobal>& a_level) {
 					   float minLevel = 0;
 					   std::visit(overload{
 									  [&](float b_level) {
@@ -118,11 +122,22 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 									  },
 								  },
 						   a_level.second);
-					   float currentValue = a_data.actor->GetActorValue(a_level.first);
-					   if (const bool match = currentValue >= minLevel; invertFilter ? !match : match) {
-						   result = true;
-					   }
-					   a_params.restrictReason = RESTRICT_REASON::kSkill;
+					   std::visit(overload{
+									  [&](RE::ActorValue av) {
+										  float currentValue = a_data.actor->GetActorValue(av);
+										  if (const bool match = currentValue >= minLevel; invertFilter ? !match : match) {
+											  result = true;
+										  }
+										  a_params.restrictReason = RESTRICT_REASON::kSkill;
+									  },
+									  [&](RE::TESFaction* faction) {
+										  float factionRank = faction ? static_cast<float>(a_data.actor->GetFactionRank(faction, a_data.actor->IsPlayerRef())) : -1.0f;
+										  if (const bool match = factionRank >= minLevel; invertFilter ? !match : match) {
+											  result = true;
+										  }
+									  },
+								  },
+						   a_level.first);
 				   },
 				   [&](RE::TESForm* a_form) {
 					   switch (a_form->GetFormType()) {

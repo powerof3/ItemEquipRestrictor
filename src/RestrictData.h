@@ -40,19 +40,19 @@ struct RestrictData
 	RestrictData() = default;
 	RestrictData(const RestrictParams& a_baseParams);
 
-	bool match_keyword(const std::string& a_filter) const;
+	bool        match_keyword(const std::string& a_filter) const;
 	static bool is_bow_or_crossbow(RE::TESForm* a_object);
 
-	RE::Actor*                          actor;
-	RE::TESBoundObject*                 object;
-	RE::TESForm*                        lHand;
-	RE::TESForm*                        rHand;
-	RE::SEX                             sex;
-	std::uint16_t                       actorLevel;
-	bool                                isObjectAmmo;
-	bool                                equippedLHandBow;
-	bool                                equippedRHandBow;
-	bool                                valid;
+	RE::Actor*          actor;
+	RE::TESBoundObject* object;
+	RE::TESForm*        lHand;
+	RE::TESForm*        rHand;
+	RE::SEX             sex;
+	std::uint16_t       actorLevel;
+	bool                isObjectAmmo;
+	bool                equippedLHandBow;
+	bool                equippedRHandBow;
+	bool                valid;
 };
 
 struct RestrictFilter
@@ -63,8 +63,9 @@ struct RestrictFilter
 	// RestrictEquip:ActorTypeVampire -> only vampires can wear this
 	// RestrictEquip:!ActorTypeVampire -> vampires cannot wear this
 
-	using Level = std::variant<std::uint16_t, RE::TESGlobal*>;
-	using ActorValueLevel = std::variant<float, RE::TESGlobal*>;
+	using ShortOrGlobal = std::variant<std::uint16_t, RE::TESGlobal*>;
+	using FactionOrAV = std::variant<RE::ActorValue, RE::TESFaction*>;
+	using FloatOrGlobal = std::variant<float, RE::TESGlobal*>;
 
 	struct Filter
 	{
@@ -85,11 +86,11 @@ struct RestrictFilter
 
 		// members
 		std::variant<
-			FLAGS,                                       // flags
-			Level,                                       // level
-			std::pair<RE::ActorValue, ActorValueLevel>,  // actorValue
-			RE::TESForm*,                                // form
-			std::string>                                 // keyword
+			FLAGS,                                  // flags
+			ShortOrGlobal,                          // level
+			std::pair<FactionOrAV, FloatOrGlobal>,  // factionRank/actorValue
+			RE::TESForm*,                           // form
+			std::string>                            // keyword
 			 filter{};
 		bool invertFilter{ false };
 	};
