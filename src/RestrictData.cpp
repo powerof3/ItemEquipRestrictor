@@ -83,13 +83,13 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 						   result = invertFilter ? a_data.sex == RE::SEX::kMale : a_data.sex == RE::SEX::kFemale;
 						   break;
 					   case Filter::FLAGS::kIsPlayer:
-						   result = invertFilter ? !a_data.actor->IsPlayerRef() : a_data.actor->IsPlayerRef();
+						   result = invertFilter ? !a_data.isPlayer : a_data.isPlayer;
 						   break;
 					   case Filter::FLAGS::kIsNPC:
-						   result = invertFilter ? a_data.actor->IsPlayerRef() : !a_data.actor->IsPlayerRef();
+						   result = invertFilter ? a_data.isPlayer : !a_data.isPlayer;
 						   break;
 					   case Filter::FLAGS::kIsInCombat:
-						   result = invertFilter ? !a_data.actor->IsInCombat() : a_data.actor->IsInCombat();
+						   result = invertFilter ? !a_data.isInCombat : a_data.isInCombat;
 						   break;
 					   default:
 						   break;
@@ -131,7 +131,7 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 										  a_params.restrictReason = RESTRICT_REASON::kSkill;
 									  },
 									  [&](RE::TESFaction* faction) {
-										  float factionRank = faction ? static_cast<float>(a_data.actor->GetFactionRank(faction, a_data.actor->IsPlayerRef())) : -1.0f;
+										  float factionRank = faction ? static_cast<float>(a_data.actor->GetFactionRank(faction, a_data.isPlayer)) : -1.0f;
 										  if (const bool match = factionRank >= minLevel; invertFilter ? !match : match) {
 											  result = true;
 										  }
@@ -202,6 +202,10 @@ RESTRICT_ON RestrictFilter::GetRestrictType(const std::string& a_keywordEDID)
 		return RESTRICT_ON::kCast;
 	}
 
+	if (a_keywordEDID.starts_with("RestrictPickUp:")) {
+		return RESTRICT_ON::kPickUp;
+	}
+
 	return RESTRICT_ON::kInvalid;
 }
 
@@ -209,11 +213,7 @@ RestrictResult RestrictFilter::MatchFilter(const RestrictData& a_data, RestrictP
 {
 	RestrictResult result{};
 
-	if (a_params.restrictOn != restrictOn) {
-		return result;
-	}
-
-	if (a_params.restrictOn == RESTRICT_ON::kEquip && a_params.restrictType == RESTRICT_TYPE::kRestrict && debuffForm && a_data.actor->IsPlayerRef()) {
+	if (a_params.restrictOn != restrictOn || (a_params.restrictType == RESTRICT_TYPE::kRestrict && debuffForm && a_data.isPlayer)) {
 		return result;
 	}
 
@@ -273,6 +273,8 @@ RestrictData::RestrictData(const RestrictParams& a_baseParams) :
 		sex = npc->GetSex();
 		actorLevel = npc->GetLevel();
 		inventoryMap = actor->GetInventory();
+		isPlayer = actor->IsPlayerRef();
+		isInCombat = actor->IsInCombat();
 		valid = true;
 	} else {
 		valid = false;

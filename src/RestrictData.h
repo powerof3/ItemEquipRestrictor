@@ -4,7 +4,8 @@ enum class RESTRICT_ON
 {
 	kInvalid,
 	kEquip,
-	kCast
+	kCast,
+	kPickUp
 };
 
 enum class RESTRICT_TYPE
@@ -48,6 +49,8 @@ struct RestrictData
 	RE::SEX                             sex;
 	std::uint16_t                       actorLevel;
 	RE::TESObjectREFR::InventoryItemMap inventoryMap;
+	bool                                isPlayer;
+	bool                                isInCombat;
 	bool                                valid;
 };
 

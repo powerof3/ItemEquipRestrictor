@@ -100,10 +100,69 @@ namespace Hooks
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
 
+	struct PickUpObject
+	{
+		static void thunk(RE::Actor* a_actor, RE::TESObjectREFR* a_object, std::int32_t a_count, bool a_arg3, bool a_playSound)
+		{
+			if (a_object) {
+				auto baseObject = a_object->GetObjectReference();
+				if (baseObject) {
+					RestrictResult result;
+					RestrictParams params{
+						RESTRICT_ON::kPickUp,
+						RESTRICT_TYPE::kRestrict,
+						RESTRICT_REASON::kGeneric,
+						a_actor,
+						baseObject
+					};
+					if (!a_object->extraList.HasQuestObjectAlias()) {
+						if (result = ItemRestrictor::Manager::GetSingleton()->ShouldSkip(params); result.shouldSkip) {
+							if (a_actor->IsPlayerRef()) {
+								const auto notification = Settings::GetSingleton()->GetNotification(params);
+								if (!notification.empty()) {
+									RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
+								}
+							}
+							return;
+						}
+					}
+					if (a_actor->IsPlayerRef()) {
+						params.restrictType = RESTRICT_TYPE::kDebuff;
+						if (result = ItemRestrictor::Manager::GetSingleton()->ShouldSkip(params); result.shouldSkip && result.debuffForm) {
+							const auto notification = Settings::GetSingleton()->GetNotification(params);
+							if (!notification.empty()) {
+								RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
+							}
+							ItemRestrictor::Manager::GetSingleton()->AddDebuff(baseObject, result.debuffForm, false);
+						}
+					}
+				}
+			}
+
+			return func(a_actor, a_object, a_count, a_arg3, a_playSound);
+		}
+		static inline REL::Relocation<decltype(thunk)> func;
+		static inline constexpr std::size_t            idx = 0x0CC;
+	};
+
+	struct DropObject
+	{
+		static void thunk(RE::Actor* a_actor, const RE::TESBoundObject* a_object, RE::ExtraDataList* a_extraList, std::int32_t a_count, const RE::NiPoint3* a_dropLoc, const RE::NiPoint3* a_rotate)
+		{
+			if (a_object) {
+				ItemRestrictor::Manager::GetSingleton()->RemoveDebuff(a_object, false);
+			}
+
+			return func(a_actor, a_object, a_extraList, a_count, a_dropLoc, a_rotate);
+		}
+		static inline REL::Relocation<decltype(thunk)> func;
+		static inline constexpr std::size_t            idx = 0x0CB;
+	};
+
 	void Install()
 	{
 		SKSE::AllocTrampoline(128);
-		
+
 		std::array targets{
 			std::make_pair(RELOCATION_ID(37938, 38894), OFFSET(0xE5, 0x170)),  //ActorEquipManager::EquipObject
 			std::make_pair(RELOCATION_ID(37937, 38893), 0xBC),                 //ActorEquipManager::EquipImpl?
@@ -119,5 +178,9 @@ namespace Hooks
 
 		REL::Relocation<std::uintptr_t> targetShout{ RELOCATION_ID(37975, 38930) };
 		stl::hook_function_prologue<DoEquipShout, 5>(targetShout.address());
+
+		stl::write_vfunc<RE::Character, PickUpObject>();
+		stl::write_vfunc<RE::PlayerCharacter, PickUpObject>();
+		stl::write_vfunc<RE::PlayerCharacter, DropObject>();
 	}
 }

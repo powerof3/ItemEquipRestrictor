@@ -49,6 +49,16 @@ bool Settings::LoadSettings()
 	ini::get_value(ini, restrictCastDebuff.skill, "RestrictCastDebuff", "sNotificationSkill", nullptr);
 	ini::get_value(ini, restrictCastDebuff.level, "RestrictCastDebuff", "sNotificationLevel", nullptr);
 
+	ini::get_value(ini, restrictPickUp.show, "RestrictPickUp", "bShowNotification", nullptr);
+	ini::get_value(ini, restrictPickUp.generic, "RestrictPickUp", "sNotificationGeneric", ";You cannot pick up {item} -> You cannot pick up Ebony Armor");
+	ini::get_value(ini, restrictPickUp.skill, "RestrictPickUp", "sNotificationSkill", nullptr);
+	ini::get_value(ini, restrictPickUp.level, "RestrictPickUp", "sNotificationLevel", nullptr);
+
+	ini::get_value(ini, restrictPickUpDebuff.show, "RestrictPickUpDebuff", "bShowNotification", nullptr);
+	ini::get_value(ini, restrictPickUpDebuff.generic, "RestrictPickUpDebuff", "sNotificationGeneric", nullptr);
+	ini::get_value(ini, restrictPickUpDebuff.skill, "RestrictPickUpDebuff", "sNotificationSkill", nullptr);
+	ini::get_value(ini, restrictPickUpDebuff.level, "RestrictPickUpDebuff", "sNotificationLevel", nullptr);
+
 	(void)ini.SaveFile(path);
 
 	return true;
@@ -67,8 +77,10 @@ std::string Settings::GetNotification(const RestrictParams& a_params) const
 		} else {
 			notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictEquipDebuff : restrictEquip;
 		}
-	} else {
+	} else if (a_params.restrictOn == RESTRICT_ON::kCast) {
 		notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictCastDebuff : restrictCast;
+	} else {
+		notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictPickUpDebuff : restrictPickUp;
 	}
 
 	if (!notification.show) {

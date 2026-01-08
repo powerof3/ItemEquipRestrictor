@@ -20,8 +20,8 @@ namespace ItemRestrictor
 		RestrictResult ShouldSkip(RestrictParams& a_params);
 		RestrictResult ShouldSkip(RE::BGSKeywordForm* a_keyword, RestrictParams& a_params);
 
-		void AddDebuff(const RE::TESBoundObject* a_item, RE::TESForm* a_debuffForm);
-		void RemoveDebuff(const RE::TESBoundObject* a_item);
+		void AddDebuff(const RE::TESBoundObject* a_item, RE::TESForm* a_debuffForm, bool equip);
+		void RemoveDebuff(const RE::TESBoundObject* a_item, bool equip);
 
 	private:
 		void ProcessShouldSkipCast(RE::Actor* a_actor, RE::MagicCaster* a_caster);
@@ -34,7 +34,9 @@ namespace ItemRestrictor
 		// members
 		StringMap<RestrictFilter>                _restrictKeywords{};
 		StringSet                                _rejectedKeywords{};
-		FlatMap<RE::FormID, FlatSet<RE::FormID>> _objectDebuffs{};
-		FlatMap<RE::FormID, FlatSet<RE::FormID>> _debuffObjects{};
+		FlatMap<RE::FormID, FlatSet<RE::FormID>> _objectEquipDebuffs{};
+		FlatMap<RE::FormID, FlatSet<RE::FormID>> _debuffEquipObjects{};
+		FlatMap<RE::FormID, FlatSet<RE::FormID>> _objectPickUpDebuffs{};
+		FlatMap<RE::FormID, FlatSet<RE::FormID>> _debuffPickUpObjects{};
 	};
 }

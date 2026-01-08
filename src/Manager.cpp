@@ -90,7 +90,7 @@ namespace ItemRestrictor
 		return result;
 	}
 
-	void Manager::AddDebuff(const RE::TESBoundObject* a_item, RE::TESForm* a_debuffForm)
+	void Manager::AddDebuff(const RE::TESBoundObject* a_item, RE::TESForm* a_debuffForm, bool equip)
 	{
 		if (a_debuffForm->Is(RE::FormType::Perk)) {
 			RE::PlayerCharacter::GetSingleton()->AddPerk(a_debuffForm->As<RE::BGSPerk>());
@@ -98,17 +98,23 @@ namespace ItemRestrictor
 			RE::PlayerCharacter::GetSingleton()->AddSpell(a_debuffForm->As<RE::SpellItem>());
 		}
 
-		_objectDebuffs[a_item->GetFormID()].insert(a_debuffForm->GetFormID());
-		_debuffObjects[a_debuffForm->GetFormID()].insert(a_item->GetFormID());
+		auto& objectDebuffs = equip ? _objectEquipDebuffs : _objectPickUpDebuffs;
+		auto& debuffObjects = equip ? _debuffEquipObjects : _debuffPickUpObjects;
+
+		objectDebuffs[a_item->GetFormID()].insert(a_debuffForm->GetFormID());
+		debuffObjects[a_debuffForm->GetFormID()].insert(a_item->GetFormID());
 	}
 
-	void Manager::RemoveDebuff(const RE::TESBoundObject* a_item)
+	void Manager::RemoveDebuff(const RE::TESBoundObject* a_item, bool equip)
 	{
 		const auto itemID = a_item->GetFormID();
 
-		if (const auto oIt = _objectDebuffs.find(itemID); oIt != _objectDebuffs.end()) {
+		auto& objectDebuffs = equip ? _objectEquipDebuffs : _objectPickUpDebuffs;
+		auto& debuffObjects = equip ? _debuffEquipObjects : _debuffPickUpObjects;
+
+		if (const auto oIt = objectDebuffs.find(itemID); oIt != objectDebuffs.end()) {
 			for (const auto& debuffID : oIt->second) {
-				if (const auto dIt = _debuffObjects.find(debuffID); dIt != _debuffObjects.end()) {
+				if (const auto dIt = debuffObjects.find(debuffID); dIt != debuffObjects.end()) {
 					if (dIt->second.erase(itemID) && dIt->second.empty()) {
 						if (const auto debuffForm = RE::TESForm::LookupByID(debuffID)) {
 							if (debuffForm->Is(RE::FormType::Perk)) {
@@ -120,7 +126,7 @@ namespace ItemRestrictor
 					}
 				}
 			}
-			_objectDebuffs.erase(oIt);
+			objectDebuffs.erase(oIt);
 		}
 	}
 
@@ -176,7 +182,7 @@ namespace ItemRestrictor
 			};
 
 			if (result = ShouldSkip(params); result.shouldSkip && result.debuffForm) {
-				AddDebuff(item, result.debuffForm);
+				AddDebuff(item, result.debuffForm, true);
 				const auto notification = Settings::GetSingleton()->GetNotification(params);
 				if (!notification.empty()) {
 					RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
@@ -196,7 +202,7 @@ namespace ItemRestrictor
 				}
 			}
 		} else {
-			RemoveDebuff(item);
+			RemoveDebuff(item, true);
 		}
 
 		return RE::BSEventNotifyControl::kContinue;
