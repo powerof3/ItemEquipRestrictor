@@ -45,19 +45,40 @@ namespace ItemRestrictor
 
 	RestrictResult Manager::ShouldSkip(RestrictParams& a_params)
 	{
+		if (a_params.object->Is(RE::FormType::Shout)) {
+			RestrictResult result;
+			
+			const auto shout = a_params.object->As<RE::TESShout>();
+			for (std::uint32_t i = 0; i < 3; ++i) {
+				const auto& shoutWord = shout->variations[i];
+				if (shoutWord.spell) {
+					result = ShouldSkip(shoutWord.spell->As<RE::BGSKeywordForm>(), a_params);
+					if (result.shouldSkip) {
+						break;
+					}
+				}
+			}
+
+			return result;
+		} else {
+			return ShouldSkip(a_params.object->As<RE::BGSKeywordForm>(), a_params);	
+		}
+	}
+
+	RestrictResult Manager::ShouldSkip(RE::BGSKeywordForm* a_keywordForm, RestrictParams& a_params)
+	{
 		RestrictResult result;
 
-		const auto keywordForm = a_params.object->As<RE::BGSKeywordForm>();
-		if (!keywordForm || keywordForm->GetNumKeywords() == 0) {
+		if (!a_keywordForm || a_keywordForm->GetNumKeywords() == 0) {
 			return result;
 		}
-
+		
 		RestrictData restrictData(a_params);
 		if (!restrictData.valid) {
 			return result;
 		}
 
-		keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
+		a_keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
 			if (const auto edid = a_keyword->GetFormEditorID(); !string::is_empty(edid)) {
 				if (result = ShouldSkip(edid, restrictData, a_params); result.shouldSkip) {
 					return RE::BSContainer::ForEachResult::kStop;
@@ -125,91 +146,6 @@ namespace ItemRestrictor
 			}
 			a_caster->InterruptCast(true);
 			RE::PlaySound("MAGFail");
-		}
-	}
-
-	namespace Equip
-	{
-		struct DoEquip
-		{
-			static void thunk(RE::ActorEquipManager* a_manager, RE::Actor* a_actor, RE::TESBoundObject* a_object, const RE::ObjectEquipParams& a_objectEquipParams)
-			{
-				if (a_actor && a_object && !a_objectEquipParams.forceEquip) {
-					if (!a_objectEquipParams.extraDataList || !a_objectEquipParams.extraDataList->HasQuestObjectAlias()) {
-						RestrictParams params{
-							RESTRICT_ON::kEquip,
-							RESTRICT_TYPE::kRestrict,
-							RESTRICT_REASON::kGeneric,
-							a_actor,
-							a_object
-						};
-						RestrictResult result;
-						if (result = Manager::GetSingleton()->ShouldSkip(params); result.shouldSkip) {
-							if (a_actor->IsPlayerRef()) {
-								const auto notification = Settings::GetSingleton()->GetNotification(params);
-								if (a_objectEquipParams.showMessage && !notification.empty()) {
-									RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
-								}
-							}
-							return;
-						}
-					}
-				}
-
-				return func(a_manager, a_actor, a_object, a_objectEquipParams);
-			}
-			static inline REL::Relocation<decltype(thunk)> func;
-		};
-
-		struct MagicEquipParams
-		{
-			RE::BGSEquipSlot* equipSlot;   // 00
-			bool              queueEquip;  // 01
-		};
-
-		struct DoEquipMagic
-		{
-			static void thunk(RE::ActorEquipManager* a_manager, RE::Actor* a_actor, RE::TESBoundObject* a_object, const MagicEquipParams& a_magicEquipParams)
-			{
-				if (a_actor && a_object) {
-					RestrictParams params{
-						RESTRICT_ON::kEquip,
-						RESTRICT_TYPE::kRestrict,
-						RESTRICT_REASON::kGeneric,
-						a_actor,
-						a_object
-					};
-					RestrictResult result;
-					if (result = Manager::GetSingleton()->ShouldSkip(params); result.shouldSkip) {
-						if (a_actor->IsPlayerRef()) {
-							const auto notification = Settings::GetSingleton()->GetNotification(params);
-							if (!notification.empty()) {
-								RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
-							}
-						}
-						return;
-					}
-				}
-
-				return func(a_manager, a_actor, a_object, a_magicEquipParams);
-			}
-			static inline REL::Relocation<decltype(thunk)> func;
-		};
-
-		void Install()
-		{
-			std::array targets{
-				std::make_pair(RELOCATION_ID(37938, 38894), OFFSET(0xE5, 0x170)),  //ActorEquipManager::EquipObject
-				std::make_pair(RELOCATION_ID(37937, 38893), 0xBC),                 //ActorEquipManager::EquipImpl?
-			};
-
-			for (const auto& [id, offset] : targets) {
-				REL::Relocation<std::uintptr_t> target{ id, offset };
-				stl::write_thunk_call<DoEquip>(target.address());
-			}
-
-			REL::Relocation<std::uintptr_t> target{ RELOCATION_ID(37973, 38928) };
-			stl::hook_function_prologue<DoEquipMagic, OFFSET(5, 6)>(target.address());
 		}
 	}
 
@@ -315,15 +251,5 @@ namespace ItemRestrictor
 		}
 
 		return RE::BSEventNotifyControl::kContinue;
-	}
-
-	void Install()
-	{
-		Settings::GetSingleton()->LoadSettings();
-		Manager::Register();
-
-		SKSE::AllocTrampoline(128);
-
-		Equip::Install();
 	}
 }

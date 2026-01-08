@@ -1,9 +1,13 @@
 #include "Manager.h"
+#include "Settings.h"
+#include "Hooks.h"
 
 void MessageHandler(SKSE::MessagingInterface::Message* a_message)
 {
 	if (a_message->type == SKSE::MessagingInterface::kPostLoad) {
-		ItemRestrictor::Install();
+		Settings::GetSingleton()->LoadSettings();
+		ItemRestrictor::Manager::Register();
+		Hooks::Install();
 	}
 }
 

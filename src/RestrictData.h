@@ -22,11 +22,11 @@ enum class RESTRICT_REASON
 
 struct RestrictParams
 {
-	RESTRICT_ON         restrictOn;
-	RESTRICT_TYPE       restrictType;
-	RESTRICT_REASON     restrictReason;
-	RE::Actor*          actor;
-	RE::TESBoundObject* object;
+	RESTRICT_ON     restrictOn;
+	RESTRICT_TYPE   restrictType;
+	RESTRICT_REASON restrictReason;
+	RE::Actor*      actor;
+	RE::TESForm*    object;
 };
 
 struct RestrictResult
@@ -43,16 +43,16 @@ struct RestrictData
 	bool        match_keyword(const std::string& a_filter) const;
 	static bool is_bow_or_crossbow(RE::TESForm* a_object);
 
-	RE::Actor*          actor;
-	RE::TESBoundObject* object;
-	RE::TESForm*        lHand;
-	RE::TESForm*        rHand;
-	RE::SEX             sex;
-	std::uint16_t       actorLevel;
-	bool                isObjectAmmo;
-	bool                equippedLHandBow;
-	bool                equippedRHandBow;
-	bool                valid;
+	RE::Actor*    actor;
+	RE::TESForm*  object;
+	RE::TESForm*  lHand;
+	RE::TESForm*  rHand;
+	RE::SEX       sex;
+	std::uint16_t actorLevel;
+	bool          isObjectAmmo;
+	bool          equippedLHandBow;
+	bool          equippedRHandBow;
+	bool          valid;
 };
 
 struct RestrictFilter
