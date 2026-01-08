@@ -262,10 +262,9 @@ bool RestrictData::match_keyword(const std::string& a_filter) const
 		return true;
 	}
 	if (isObjectAmmo) {
-		if (!equippedRHandBow && !equippedLHandBow) {
+		if (equippedRHandBow && rHand->HasKeywordByEditorID(a_filter) || equippedLHandBow && lHand->HasKeywordByEditorID(a_filter)) {
 			return true;
 		}
-		return equippedRHandBow && rHand->HasKeywordByEditorID(a_filter) || equippedLHandBow && lHand->HasKeywordByEditorID(a_filter);
 	}
 	for (auto& [item, data] : actor->GetInventory()) {
 		auto& [count, entry] = data;
