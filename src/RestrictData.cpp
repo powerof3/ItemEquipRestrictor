@@ -272,6 +272,7 @@ RestrictData::RestrictData(const RestrictParams& a_baseParams) :
 	if (npc) {
 		sex = npc->GetSex();
 		actorLevel = npc->GetLevel();
+		inventoryMap = actor->GetInventory();
 		valid = true;
 	} else {
 		valid = false;
@@ -283,7 +284,7 @@ bool RestrictData::match_keyword(const std::string& a_filter, RE::TESForm* a_obj
 	if (actor->HasKeywordString(a_filter)) {
 		return true;
 	}
-	for (auto& [item, data] : actor->GetInventory()) {
+	for (auto& [item, data] : inventoryMap) {
 		auto& [count, entry] = data;
 		if (entry->IsWorn() && count > 0 && item != a_object && item->HasKeywordByEditorID(a_filter)) {
 			return true;

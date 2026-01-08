@@ -43,11 +43,12 @@ struct RestrictData
 	bool        match_keyword(const std::string& a_filter, RE::TESForm* a_object) const;
 	static bool is_bow_or_crossbow(RE::TESForm* a_object);
 
-	RE::Actor*    actor;
-	RE::TESForm*  object;
-	RE::SEX       sex;
-	std::uint16_t actorLevel;
-	bool          valid;
+	RE::Actor*                          actor;
+	RE::TESForm*                        object;
+	RE::SEX                             sex;
+	std::uint16_t                       actorLevel;
+	RE::TESObjectREFR::InventoryItemMap inventoryMap;
+	bool                                valid;
 };
 
 struct RestrictFilter
