@@ -161,6 +161,41 @@ namespace ItemRestrictor
 			static inline REL::Relocation<decltype(thunk)> func;
 		};
 
+		struct MagicEquipParams
+		{
+			RE::BGSEquipSlot* equipSlot;   // 00
+			bool              queueEquip;  // 01
+		};
+
+		struct DoEquipMagic
+		{
+			static void thunk(RE::ActorEquipManager* a_manager, RE::Actor* a_actor, RE::TESBoundObject* a_object, const MagicEquipParams& a_magicEquipParams)
+			{
+				if (a_actor && a_object) {
+					RestrictParams params{
+						RESTRICT_ON::kEquip,
+						RESTRICT_TYPE::kRestrict,
+						RESTRICT_REASON::kGeneric,
+						a_actor,
+						a_object
+					};
+					RestrictResult result;
+					if (result = Manager::GetSingleton()->ShouldSkip(params); result.shouldSkip) {
+						if (a_actor->IsPlayerRef()) {
+							const auto notification = Settings::GetSingleton()->GetNotification(params);
+							if (!notification.empty()) {
+								RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
+							}
+						}
+						return;
+					}
+				}
+
+				return func(a_manager, a_actor, a_object, a_magicEquipParams);
+			}
+			static inline REL::Relocation<decltype(thunk)> func;
+		};
+
 		void Install()
 		{
 			std::array targets{
@@ -172,6 +207,9 @@ namespace ItemRestrictor
 				REL::Relocation<std::uintptr_t> target{ id, offset };
 				stl::write_thunk_call<DoEquip>(target.address());
 			}
+
+			REL::Relocation<std::uintptr_t> target{ RELOCATION_ID(37973, 38928) };
+			stl::hook_function_prologue<DoEquipMagic, OFFSET(5, 6)>(target.address());
 		}
 	}
 
@@ -283,6 +321,8 @@ namespace ItemRestrictor
 	{
 		Settings::GetSingleton()->LoadSettings();
 		Manager::Register();
+
+		SKSE::AllocTrampoline(128);
 
 		Equip::Install();
 	}

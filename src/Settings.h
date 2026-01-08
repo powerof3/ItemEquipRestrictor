@@ -18,9 +18,12 @@ private:
 		std::string level;
 	};
 
-	Notification notificationRestrict { true, "You cannot equip this item", "You lack the necessary skill to equip this item", "You lack the necessary level to equip this item" };
-	Notification notificationSpellRestrict{ true, "You cannot cast this spell", "You lack the necessary skill to cast this spell", "You lack the necessary level to cast this spell" };
+	Notification restrictEquip { true, "You cannot equip this item", "You lack the necessary skill to equip this item", "You lack the necessary level to equip this item" };
+	Notification restrictEquipDebuff{ true, "You cannot equip this item", "You lack the necessary skill to properly equip this item", "You lack the necessary level to properly equip this item" };
 
-    Notification notificationDebuff{ true, "You cannot equip this item", "You lack the necessary skill to properly equip this item", "You lack the necessary level to properly equip this item" };
-	Notification notificationSpellDebuff{ true, "You cannot cast this spell", "You lack the necessary skill to properly cast this spell", "You lack the necessary level to properly cast this spell" };
+	Notification restrictEquipSpell{ true, "You cannot equip this spell", "You lack the necessary skill to equip this spell", "You lack the necessary level to equip this spell" };
+	Notification restrictEquipSpellDebuff{ true, "You cannot cast this spell", "You lack the necessary skill to properly equip this spell", "You lack the necessary level to properly equip this spell" };
+
+	Notification restrictCast{ true, "You cannot cast this spell", "You lack the necessary skill to cast this spell", "You lack the necessary level to cast this spell" };
+	Notification restrictCastDebuff{ true, "You cannot cast this spell", "You lack the necessary skill to properly cast this spell", "You lack the necessary level to properly cast this spell" };
 };

@@ -9,21 +9,35 @@ bool Settings::LoadSettings()
 
 	ini.LoadFile(path);
 
-	ini::get_value(ini, notificationRestrict.show, "Restrict", "bShowNotification", nullptr);
-	ini::get_value(ini, notificationRestrict.generic, "Restrict", "sNotificationGeneric", ";You cannot equip {item} -> You cannot equip Ebony Armor");
-	ini::get_value(ini, notificationSpellRestrict.generic, "Restrict", "sNotificationSpellGeneric", nullptr);
-	ini::get_value(ini, notificationRestrict.skill, "Restrict", "sNotificationSkill", nullptr);
-	ini::get_value(ini, notificationSpellRestrict.skill, "Restrict", "sNotificationSpellSkill", nullptr);
-	ini::get_value(ini, notificationRestrict.level, "Restrict", "sNotificationLevel", nullptr);
-	ini::get_value(ini, notificationSpellRestrict.level, "Restrict", "sNotificationSpellLevel", nullptr);
+	ini::get_value(ini, restrictEquip.show, "RestrictEquip", "bShowNotification", nullptr);
+	ini::get_value(ini, restrictEquip.generic, "RestrictEquip", "sNotificationGeneric", ";You cannot equip {item} -> You cannot equip Ebony Armor");
+	ini::get_value(ini, restrictEquip.skill, "RestrictEquip", "sNotificationSkill", nullptr);
+	ini::get_value(ini, restrictEquip.level, "RestrictEquip", "sNotificationLevel", nullptr);
 
-	ini::get_value(ini, notificationRestrict.show, "Debuff", "bShowNotification", "");
-	ini::get_value(ini, notificationDebuff.generic, "Debuff", "sNotificationGeneric", nullptr);
-	ini::get_value(ini, notificationSpellDebuff.generic, "Debuff", "sNotificationSpellGeneric", nullptr);
-	ini::get_value(ini, notificationDebuff.skill, "Debuff", "sNotificationSkill", nullptr);
-	ini::get_value(ini, notificationSpellDebuff.skill, "Debuff", "sNotificationSpellSkill", nullptr);
-	ini::get_value(ini, notificationDebuff.level, "Debuff", "sNotificationLevel", nullptr);
-	ini::get_value(ini, notificationSpellDebuff.level, "Debuff", "sNotificationSpellLevel", nullptr);
+	ini::get_value(ini, restrictEquipDebuff.show, "RestrictEquipDebuff", "bShowNotification", nullptr);
+	ini::get_value(ini, restrictEquipDebuff.generic, "RestrictEquipDebuff", "sNotificationGeneric", nullptr);
+	ini::get_value(ini, restrictEquipDebuff.skill, "RestrictEquipDebuff", "sNotificationSkill", nullptr);
+	ini::get_value(ini, restrictEquipDebuff.level, "RestrictEquipDebuff", "sNotificationLevel", nullptr);
+
+	ini::get_value(ini, restrictEquipSpell.show, "RestrictEquipSpell", "bShowNotification", nullptr);
+	ini::get_value(ini, restrictEquipSpell.generic, "RestrictEquipSpell", "sNotificationGeneric", nullptr);
+	ini::get_value(ini, restrictEquipSpell.skill, "RestrictEquipSpell", "sNotificationSkill", nullptr);
+	ini::get_value(ini, restrictEquipSpell.level, "RestrictEquipSpell", "sNotificationLevel", nullptr);
+
+	ini::get_value(ini, restrictEquipSpellDebuff.show, "RestrictEquipSpellDebuff", "bShowNotification", nullptr);
+	ini::get_value(ini, restrictEquipSpellDebuff.generic, "RestrictEquipSpellDebuff", "sNotificationGeneric", nullptr);
+	ini::get_value(ini, restrictEquipSpellDebuff.skill, "RestrictEquipSpellDebuff", "sNotificationSkill", nullptr);
+	ini::get_value(ini, restrictEquipSpellDebuff.level, "RestrictEquipSpellDebuff", "sNotificationLevel", nullptr);
+
+	ini::get_value(ini, restrictCast.show, "RestrictCast", "bShowNotification", nullptr);
+	ini::get_value(ini, restrictCast.generic, "RestrictCast", "sNotificationGeneric", nullptr);
+	ini::get_value(ini, restrictCast.skill, "RestrictCast", "sNotificationSkill", nullptr);
+	ini::get_value(ini, restrictCast.level, "RestrictCast", "sNotificationLevel", nullptr);
+
+	ini::get_value(ini, restrictCastDebuff.show, "RestrictCastDebuff", "bShowNotification", nullptr);
+	ini::get_value(ini, restrictCastDebuff.generic, "RestrictCastDebuff", "sNotificationGeneric", nullptr);
+	ini::get_value(ini, restrictCastDebuff.skill, "RestrictCastDebuff", "sNotificationSkill", nullptr);
+	ini::get_value(ini, restrictCastDebuff.level, "RestrictCastDebuff", "sNotificationLevel", nullptr);
 
 	(void)ini.SaveFile(path);
 
@@ -36,10 +50,13 @@ std::string Settings::GetNotification(const RestrictParams& a_params) const
 
 	Notification notification;
 	if (a_params.restrictOn == RESTRICT_ON::kEquip) {
-		notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? notificationDebuff : notificationRestrict;
+		if (a_params.object->Is(RE::FormType::Spell)) {
+			notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictEquipSpellDebuff : restrictEquipSpell;
+		} else {
+			notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictEquipDebuff : restrictEquip;
+		}
 	} else {
-		notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? notificationSpellDebuff : notificationSpellRestrict;
-		notification.show = a_params.restrictType == RESTRICT_TYPE::kDebuff ? notificationDebuff.show : notificationRestrict.show;
+		notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictCastDebuff : restrictCast;
 	}
 
 	if (!notification.show) {
