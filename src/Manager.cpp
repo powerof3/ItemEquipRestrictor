@@ -22,206 +22,51 @@ namespace ItemRestrictor
 		a_actor->RemoveAnimationGraphEventSink(GetSingleton());
 	}
 
-	void Manager::get_npc_edids(RE::Actor* a_actor, const RE::TESNPC* a_npc, std::vector<std::string>& a_edids)
+	RestrictResult Manager::ShouldSkip(const std::string& a_keywordEDID, const RestrictData& a_data, RestrictParams& a_params)
 	{
-		if (const auto extraLvlCreature = a_actor->extraList.GetByType<RE::ExtraLeveledCreature>()) {
-			if (const auto originalBase = extraLvlCreature->originalBase) {
-				a_edids.emplace_back(edid::get_editorID(originalBase));
-			}
-			if (const auto templateBase = extraLvlCreature->templateBase) {
-				a_edids.emplace_back(edid::get_editorID(templateBase));
-			}
-		} else {
-			a_edids.emplace_back(edid::get_editorID(a_npc));
+		RestrictResult result;
+
+		if (_rejectedKeywords.contains(a_keywordEDID)) {
+			return result;
 		}
+
+		auto it = _restrictKeywords.find(a_keywordEDID);
+		if (it == _restrictKeywords.end()) {
+			auto restrictType = RestrictFilter::GetRestrictType(a_keywordEDID);
+			if (restrictType == RESTRICT_ON::kInvalid) {
+				_rejectedKeywords.emplace(a_keywordEDID);
+				return result;
+			}
+			it = _restrictKeywords.try_emplace(a_keywordEDID, a_keywordEDID, restrictType).first;
+		}
+
+		return it->second.MatchFilter(a_data, a_params);
 	}
 
-	bool Manager::is_bow_or_crossbow(RE::TESForm* a_object)
+	RestrictResult Manager::ShouldSkip(RestrictParams& a_params)
 	{
-		if (const auto weap = a_object->As<RE::TESObjectWEAP>(); weap && (weap->IsBow() || weap->IsCrossbow())) {
-			return true;
-		}
-		return false;
-	}
+		RestrictResult result;
 
-	std::pair<bool, RE::TESForm*> Manager::ShouldSkip(const std::string& a_keywordEDID, RE::Actor* a_actor, const RE::TESNPC* a_npc, const RE::TESBoundObject* a_object, RestrictParams& a_params)
-	{
-		if (a_params.restrictOn == RESTRICT_ON::kEquip && !a_keywordEDID.starts_with("RestrictEquip:") || a_params.restrictOn == RESTRICT_ON::kCast && !a_keywordEDID.starts_with("RestrictCast:")) {
-			return { false, nullptr };
+		const auto keywordForm = a_params.object->As<RE::BGSKeywordForm>();
+		if (!keywordForm || keywordForm->GetNumKeywords() == 0) {
+			return result;
 		}
 
-		const auto restrict_kywd = string::split(a_keywordEDID, ":");
-		const auto isPlayer = a_actor->IsPlayerRef();
-
-		// contains debuff perk param
-		if (a_params.restrictOn == RESTRICT_ON::kEquip && a_params.restrictType == RESTRICT_TYPE::kRestrict && restrict_kywd.size() > 2 && isPlayer) {
-			return { false, nullptr };
+		RestrictData restrictData(a_params);
+		if (!restrictData.valid) {
+			return result;
 		}
 
-		const auto sex = a_npc->GetSex();
-		const auto actorLevel = a_npc->GetLevel();
-		const auto lHand = a_actor->GetEquippedObject(true);
-		const auto rHand = a_actor->GetEquippedObject(false);
-		const auto isAmmo = a_object->IsAmmo();
-		const auto isLHandBow = isAmmo && lHand && is_bow_or_crossbow(lHand);
-		const auto isRHandBow = isAmmo && rHand && is_bow_or_crossbow(rHand);
-		const auto inCombat = a_actor->IsInCombat();
-		const auto inventory = a_actor->GetInventory();
-
-		const auto match_keywords = [&](const std::string& a_filter) {
-			if (a_actor->HasKeywordString(a_filter)) {
-				return true;
-			}
-			if (isAmmo) {
-				if (!isLHandBow && !isRHandBow) {
-					return true;
-				}
-				return isRHandBow && rHand->HasKeywordByEditorID(a_filter) || isLHandBow && lHand->HasKeywordByEditorID(a_filter);
-			}
-			for (auto& [item, data] : inventory) {
-				auto& [count, entry] = data;
-				if (entry->IsWorn() && count > 0 && item->HasKeywordByEditorID(a_filter)) {
-					return true;
+		keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
+			if (const auto edid = a_keyword->GetFormEditorID(); !string::is_empty(edid)) {
+				if (result = ShouldSkip(edid, restrictData, a_params); result.shouldSkip) {
+					return RE::BSContainer::ForEachResult::kStop;
 				}
 			}
-			return false;
-		};
+			return RE::BSContainer::ForEachResult::kContinue;
+		});
 
-		const auto match_filter = [&](const std::string& a_filter) {
-			// RestrictEquip:Female -> men cannot wear this
-			// RestrictEquip:!Female -> only men can wear this
-
-			// RestrictEquip:ActorTypeVampire -> only vampires can wear this
-			// RestrictEquip:!ActorTypeVampire -> vampires cannot wear this
-
-			std::string filter_copy = a_filter;
-
-			bool invert = false;
-			if (filter_copy.starts_with('!')) {
-				invert = true;
-				filter_copy.erase(0, 1);
-			}
-
-			switch (string::const_hash(filter_copy)) {
-			case "Male"_h:
-				return invert ? sex == RE::SEX::kFemale : sex == RE::SEX::kMale;
-			case "Female"_h:
-				return invert ? sex == RE::SEX::kMale : sex == RE::SEX::kFemale;
-			case "Player"_h:
-				return invert ? !isPlayer : isPlayer;
-			case "NPC"_h:
-				return invert ? isPlayer : !isPlayer;
-			case "Combat"_h:
-				return invert ? inCombat : !inCombat;
-			default:
-				{
-					if (filter_copy.starts_with("Level(")) {
-						static srell::regex pattern(R"(\(([^)]+)\))");
-						if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
-							std::uint16_t level;
-							if (string::is_only_digit(matches[1].str())) {
-								level = string::to_num<std::uint16_t>(matches[1].str());
-							} else {
-								level = static_cast<std::uint16_t>(RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[1].str())->value);
-							}
-							if (const auto match = actorLevel >= level; invert ? !match : match) {
-								return true;
-							}
-							a_params.restrictReason = RESTRICT_REASON::kLevel;
-						}
-						return false;
-					}
-
-					if (filter_copy.contains("(")) {
-						static srell::regex pattern(R"(([^\(]*)\(([^)]+)\))");
-						if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
-							RE::ActorValue av;
-							float          minLevel;
-
-							if (string::is_only_digit(matches[1].str())) {
-								av = string::to_num<RE::ActorValue>(matches[1].str());
-							} else {
-								av = RE::ActorValueList::GetSingleton()->LookupActorValueByName(matches[1].str());
-							}
-							if (string::is_only_digit(matches[2].str())) {
-								minLevel = string::to_num<float>(matches[2].str());
-							} else {
-								minLevel = RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[2].str())->value;
-							}
-
-							if (const bool match = a_actor->GetActorValue(av) >= minLevel; invert ? !match : match) {
-								return true;
-							}
-							a_params.restrictReason = RESTRICT_REASON::kSkill;
-						}
-						return false;
-					}
-
-					bool match;
-
-					if (const auto filterForm = RE::TESForm::LookupByEditorID(filter_copy)) {
-						switch (filterForm->GetFormType()) {
-						case RE::FormType::Faction:
-							{
-								match = a_actor->IsInFaction(filterForm->As<RE::TESFaction>());
-								return invert ? !match : match;
-							}
-						case RE::FormType::Perk:
-							{
-								match = a_actor->HasPerk(filterForm->As<RE::BGSPerk>());
-								return invert ? !match : match;
-							}
-						case RE::FormType::Race:
-							{
-								match = a_actor->GetRace() == filterForm;
-								return invert ? !match : match;
-							}
-						default:
-							break;
-						}
-					}
-
-					match = match_keywords(filter_copy);
-					return invert ? !match : match;
-				}
-			}
-		};
-
-		const auto split_filters = string::split(restrict_kywd[1], ",");
-		bool       shouldSkip = std::ranges::none_of(split_filters, [&](const std::string& a_filter) {
-            if (a_filter.contains('+')) {
-                const auto chained_filters = string::split(a_filter, "+");
-                return std::ranges::all_of(chained_filters, match_filter);
-            } else {
-                return match_filter(a_filter);
-            }
-        });
-
-		return { shouldSkip, restrict_kywd.size() > 2 ? RE::TESForm::LookupByEditorID(restrict_kywd[2]) : nullptr };
-	}
-
-	std::pair<bool, RE::TESForm*> Manager::ShouldSkip(RE::Actor* a_actor, RE::TESBoundObject* a_object, RestrictParams& a_params)
-	{
-		bool         skipEquip = false;
-		RE::TESForm* debuffForm = nullptr;
-
-		const auto base = a_actor->GetActorBase();
-		if (!base) {
-			return { skipEquip, debuffForm };
-		}
-
-		if (const auto keywordForm = a_object->As<RE::BGSKeywordForm>()) {
-			keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
-				if (const auto edid = a_keyword->GetFormEditorID(); !string::is_empty(edid)) {
-					if (std::tie(skipEquip, debuffForm) = ShouldSkip(edid, a_actor, base, a_object, a_params); skipEquip) {
-						return RE::BSContainer::ForEachResult::kStop;
-					}
-				}
-				return RE::BSContainer::ForEachResult::kContinue;
-			});
-		}
-
-		return { skipEquip, debuffForm };
+		return result;
 	}
 
 	void Manager::AddDebuff(const RE::TESBoundObject* a_item, RE::TESForm* a_debuffForm)
@@ -232,17 +77,17 @@ namespace ItemRestrictor
 			RE::PlayerCharacter::GetSingleton()->AddSpell(a_debuffForm->As<RE::SpellItem>());
 		}
 
-		_objectDebuffsMap[a_item->GetFormID()].insert(a_debuffForm->GetFormID());
-		_debuffObjectsMap[a_debuffForm->GetFormID()].insert(a_item->GetFormID());
+		_objectDebuffs[a_item->GetFormID()].insert(a_debuffForm->GetFormID());
+		_debuffObjects[a_debuffForm->GetFormID()].insert(a_item->GetFormID());
 	}
 
 	void Manager::RemoveDebuff(const RE::TESBoundObject* a_item)
 	{
 		const auto itemID = a_item->GetFormID();
 
-		if (const auto oIt = _objectDebuffsMap.find(itemID); oIt != _objectDebuffsMap.end()) {
+		if (const auto oIt = _objectDebuffs.find(itemID); oIt != _objectDebuffs.end()) {
 			for (const auto& debuffID : oIt->second) {
-				if (const auto dIt = _debuffObjectsMap.find(debuffID); dIt != _debuffObjectsMap.end()) {
+				if (const auto dIt = _debuffObjects.find(debuffID); dIt != _debuffObjects.end()) {
 					if (dIt->second.erase(itemID) && dIt->second.empty()) {
 						if (const auto debuffForm = RE::TESForm::LookupByID(debuffID)) {
 							if (debuffForm->Is(RE::FormType::Perk)) {
@@ -254,7 +99,7 @@ namespace ItemRestrictor
 					}
 				}
 			}
-			_objectDebuffsMap.erase(oIt);
+			_objectDebuffs.erase(oIt);
 		}
 	}
 
@@ -266,13 +111,16 @@ namespace ItemRestrictor
 		RestrictParams params{
 			RESTRICT_ON::kCast,
 			RESTRICT_TYPE::kRestrict,
-			RESTRICT_REASON::kGeneric
+			RESTRICT_REASON::kGeneric,
+			a_actor,
+			a_caster->currentSpell
 		};
-		if (auto [skipEquip, debuffForm] = ShouldSkip(a_actor, a_caster->currentSpell, params); skipEquip) {
+		RestrictResult result;
+		if (result = ShouldSkip(params); result.shouldSkip) {
 			if (a_actor->IsPlayerRef()) {
-				const auto notification = Settings::GetSingleton()->GetNotification(a_caster->currentSpell, params);
+				const auto notification = Settings::GetSingleton()->GetNotification(params);
 				if (!notification.empty()) {
-					RE::DebugNotification(notification.c_str());
+					RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
 				}
 			}
 			a_caster->InterruptCast(true);
@@ -291,13 +139,16 @@ namespace ItemRestrictor
 						RestrictParams params{
 							RESTRICT_ON::kEquip,
 							RESTRICT_TYPE::kRestrict,
-							RESTRICT_REASON::kGeneric
+							RESTRICT_REASON::kGeneric,
+							a_actor,
+							a_object
 						};
-						if (auto [skipEquip, debuffForm] = Manager::ShouldSkip(a_actor, a_object, params); skipEquip) {
+						RestrictResult result;
+						if (result = Manager::GetSingleton()->ShouldSkip(params); result.shouldSkip) {
 							if (a_actor->IsPlayerRef()) {
-								const auto notification = Settings::GetSingleton()->GetNotification(a_object, params);
+								const auto notification = Settings::GetSingleton()->GetNotification(params);
 								if (a_objectEquipParams.showMessage && !notification.empty()) {
-									RE::DebugNotification(notification.c_str());
+									RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
 								}
 							}
 							return;
@@ -341,17 +192,25 @@ namespace ItemRestrictor
 		}
 
 		if (a_evn->equipped) {
-			RestrictParams params{ RESTRICT_ON::kEquip, RESTRICT_TYPE::kDebuff, RESTRICT_REASON::kGeneric };
-			if (auto [skipEquip, debuffForm] = ShouldSkip(actor, item, params); skipEquip && debuffForm) {
-				AddDebuff(item, debuffForm);
-				const auto notification = Settings::GetSingleton()->GetNotification(item, params);
+			RestrictParams params{
+				RESTRICT_ON::kEquip,
+				RESTRICT_TYPE::kDebuff,
+				RESTRICT_REASON::kGeneric,
+				actor,
+				item
+			};
+			RestrictResult result;
+			if (result = ShouldSkip(params); result.shouldSkip && result.debuffForm) {
+				AddDebuff(item, result.debuffForm);
+				const auto notification = Settings::GetSingleton()->GetNotification(params);
 				if (!notification.empty()) {
-					RE::DebugNotification(notification.c_str());
+					RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
 				}
-			} else if (is_bow_or_crossbow(item)) {
+			} else if (RestrictData::is_bow_or_crossbow(item)) {
 				if (const auto ammo = actor->GetCurrentAmmo()) {
 					params.restrictType = RESTRICT_TYPE::kRestrict;
-					if (std::tie(skipEquip, debuffForm) = ShouldSkip(actor, ammo, params); skipEquip) {
+					params.object = ammo;
+					if (result = ShouldSkip(params); result.shouldSkip) {
 						SKSE::GetTaskInterface()->AddTask([actor, ammo]() {
 							RE::ActorEquipManager::GetSingleton()->UnequipObject(actor, ammo);
 							RE::SendUIMessage::SendInventoryUpdateMessage(actor, nullptr);
@@ -405,12 +264,15 @@ namespace ItemRestrictor
 
 		switch (string::const_hash(a_evn->tag)) {
 		case "BeginCastLeft"_h:
+			logger::info("{}:{}", actor->GetName(), a_evn->tag.c_str());
 			ProcessShouldSkipCast(actor, actor->magicCasters[0]);
 			break;
 		case "BeginCastRight"_h:
+			logger::info("{}:{}", actor->GetName(), a_evn->tag.c_str());
 			ProcessShouldSkipCast(actor, actor->magicCasters[1]);
 			break;
 		case "BeginCastVoice"_h:
+			logger::info("{}:{}", actor->GetName(), a_evn->tag.c_str());
 			ProcessShouldSkipCast(actor, actor->magicCasters[3]);
 			break;
 		default:

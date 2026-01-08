@@ -132,6 +132,8 @@ else ()
 	)
 endif()
 
+find_package(boost_unordered CONFIG REQUIRED)
+
 find_path(CLIB_UTIL_INCLUDE_DIRS "ClibUtil/utils.hpp")
 find_path(SRELL_INCLUDE_DIRS "srell.hpp")
 
@@ -193,6 +195,7 @@ target_link_libraries(
 	${PROJECT_NAME}
 	PRIVATE
 		${CommonLibName}::${CommonLibName}
+		Boost::unordered
 )
 
 target_precompile_headers(

@@ -30,7 +30,7 @@ bool Settings::LoadSettings()
 	return true;
 }
 
-std::string Settings::GetNotification(const RE::TESBoundObject* a_object, const RestrictParams& a_params) const
+std::string Settings::GetNotification(const RestrictParams& a_params) const
 {
 	std::string finalNotification;
 
@@ -58,6 +58,6 @@ std::string Settings::GetNotification(const RE::TESBoundObject* a_object, const 
 		break;
 	}
 
-	string::replace_all(finalNotification, "{item}", a_object->GetName());
+	string::replace_all(finalNotification, "{item}", a_params.object->GetName());
 	return finalNotification;
 }

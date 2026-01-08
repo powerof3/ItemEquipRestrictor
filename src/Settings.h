@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Manager.h"
+#include "RestrictData.h"
 
-class Settings : public ISingleton<Settings>
+class Settings : public REX::Singleton<Settings>
 {
 public:
     bool        LoadSettings();
-	std::string GetNotification(const RE::TESBoundObject* a_object, const RestrictParams& a_params) const;
+	std::string GetNotification(const RestrictParams& a_params) const;
 
 private:
 	// members
