@@ -264,15 +264,12 @@ namespace ItemRestrictor
 
 		switch (string::const_hash(a_evn->tag)) {
 		case "BeginCastLeft"_h:
-			logger::info("{}:{}", actor->GetName(), a_evn->tag.c_str());
 			ProcessShouldSkipCast(actor, actor->magicCasters[0]);
 			break;
 		case "BeginCastRight"_h:
-			logger::info("{}:{}", actor->GetName(), a_evn->tag.c_str());
 			ProcessShouldSkipCast(actor, actor->magicCasters[1]);
 			break;
 		case "BeginCastVoice"_h:
-			logger::info("{}:{}", actor->GetName(), a_evn->tag.c_str());
 			ProcessShouldSkipCast(actor, actor->magicCasters[3]);
 			break;
 		default:
