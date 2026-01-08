@@ -176,7 +176,7 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 					   }
 				   },
 				   [&](const std::string& a_keyword) {
-					   bool match = a_data.match_keyword(a_keyword);
+					   bool match = a_data.match_keyword(a_keyword, a_data.object);
 					   result = invertFilter ? !match : match;
 				   },
 			   },
@@ -272,30 +272,20 @@ RestrictData::RestrictData(const RestrictParams& a_baseParams) :
 	if (npc) {
 		sex = npc->GetSex();
 		actorLevel = npc->GetLevel();
-		lHand = actor->GetEquippedObject(true);
-		rHand = actor->GetEquippedObject(false);
-		isObjectAmmo = object->IsAmmo();
-		equippedLHandBow = isObjectAmmo && lHand && is_bow_or_crossbow(lHand);
-		equippedRHandBow = isObjectAmmo && rHand && is_bow_or_crossbow(rHand);
 		valid = true;
 	} else {
 		valid = false;
 	}
 }
 
-bool RestrictData::match_keyword(const std::string& a_filter) const
+bool RestrictData::match_keyword(const std::string& a_filter, RE::TESForm* a_object) const
 {
 	if (actor->HasKeywordString(a_filter)) {
 		return true;
 	}
-	if (isObjectAmmo) {
-		if (equippedRHandBow && rHand->HasKeywordByEditorID(a_filter) || equippedLHandBow && lHand->HasKeywordByEditorID(a_filter)) {
-			return true;
-		}
-	}
 	for (auto& [item, data] : actor->GetInventory()) {
 		auto& [count, entry] = data;
-		if (entry->IsWorn() && count > 0 && item->HasKeywordByEditorID(a_filter)) {
+		if (entry->IsWorn() && count > 0 && item != a_object && item->HasKeywordByEditorID(a_filter)) {
 			return true;
 		}
 	}

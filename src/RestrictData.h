@@ -40,18 +40,13 @@ struct RestrictData
 	RestrictData() = default;
 	RestrictData(const RestrictParams& a_baseParams);
 
-	bool        match_keyword(const std::string& a_filter) const;
+	bool        match_keyword(const std::string& a_filter, RE::TESForm* a_object) const;
 	static bool is_bow_or_crossbow(RE::TESForm* a_object);
 
 	RE::Actor*    actor;
 	RE::TESForm*  object;
-	RE::TESForm*  lHand;
-	RE::TESForm*  rHand;
 	RE::SEX       sex;
 	std::uint16_t actorLevel;
-	bool          isObjectAmmo;
-	bool          equippedLHandBow;
-	bool          equippedRHandBow;
 	bool          valid;
 };
 

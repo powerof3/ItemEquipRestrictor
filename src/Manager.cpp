@@ -47,7 +47,7 @@ namespace ItemRestrictor
 	{
 		if (a_params.object->Is(RE::FormType::Shout)) {
 			RestrictResult result;
-			
+
 			const auto shout = a_params.object->As<RE::TESShout>();
 			for (std::uint32_t i = 0; i < 3; ++i) {
 				const auto& shoutWord = shout->variations[i];
@@ -61,7 +61,7 @@ namespace ItemRestrictor
 
 			return result;
 		} else {
-			return ShouldSkip(a_params.object->As<RE::BGSKeywordForm>(), a_params);	
+			return ShouldSkip(a_params.object->As<RE::BGSKeywordForm>(), a_params);
 		}
 	}
 
@@ -72,7 +72,7 @@ namespace ItemRestrictor
 		if (!a_keywordForm || a_keywordForm->GetNumKeywords() == 0) {
 			return result;
 		}
-		
+
 		RestrictData restrictData(a_params);
 		if (!restrictData.valid) {
 			return result;
@@ -156,7 +156,7 @@ namespace ItemRestrictor
 		}
 
 		const auto actor = a_evn->actor->As<RE::Actor>();
-		if (!actor || !a_evn->actor->IsPlayerRef()) {
+		if (!actor || !actor->IsPlayerRef()) {
 			return RE::BSEventNotifyControl::kContinue;
 		}
 
@@ -166,6 +166,7 @@ namespace ItemRestrictor
 		}
 
 		if (a_evn->equipped) {
+			RestrictResult result;
 			RestrictParams params{
 				RESTRICT_ON::kEquip,
 				RESTRICT_TYPE::kDebuff,
@@ -173,14 +174,16 @@ namespace ItemRestrictor
 				actor,
 				item
 			};
-			RestrictResult result;
+
 			if (result = ShouldSkip(params); result.shouldSkip && result.debuffForm) {
 				AddDebuff(item, result.debuffForm);
 				const auto notification = Settings::GetSingleton()->GetNotification(params);
 				if (!notification.empty()) {
 					RE::SendHUDMessage::ShowHUDMessage(notification.c_str());
 				}
-			} else if (RestrictData::is_bow_or_crossbow(item)) {
+			}
+
+			if (RestrictData::is_bow_or_crossbow(item)) {
 				if (const auto ammo = actor->GetCurrentAmmo()) {
 					params.restrictType = RESTRICT_TYPE::kRestrict;
 					params.object = ammo;
