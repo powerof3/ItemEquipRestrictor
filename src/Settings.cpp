@@ -30,7 +30,7 @@ bool Settings::LoadSettings()
 	ini::get_value(ini, restrictEquipSpellDebuff.level, "RestrictEquipSpellDebuff", "sNotificationLevel", nullptr);
 
 	ini::get_value(ini, restrictEquipShout.show, "RestrictEquipShout", "bShowNotification", nullptr);
-	ini::get_value(ini, restrictEquipShout.generic, "RestrictEquipShout", "sNotificationGeneric",";You cannot equip {shout} -> You cannot equip Unrelenting Force");
+	ini::get_value(ini, restrictEquipShout.generic, "RestrictEquipShout", "sNotificationGeneric", ";You cannot equip {shout} -> You cannot equip Unrelenting Force");
 	ini::get_value(ini, restrictEquipShout.skill, "RestrictEquipShout", "sNotificationSkill", nullptr);
 	ini::get_value(ini, restrictEquipShout.level, "RestrictEquipShout", "sNotificationLevel", nullptr);
 
@@ -68,48 +68,60 @@ std::string Settings::GetNotification(const RestrictParams& a_params) const
 {
 	std::string finalNotification;
 
-	Notification notification;
+	const bool          isDebuff = a_params.restrictType == RESTRICT_TYPE::kDebuff;
+	const Notification* notification;
+
 	if (a_params.restrictOn == RESTRICT_ON::kEquip) {
-		if (a_params.object->Is(RE::FormType::Spell)) {
-			notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictEquipSpellDebuff : restrictEquipSpell;
-		} else if (a_params.object->Is(RE::FormType::Shout)) {
-			notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictEquipShoutDebuff : restrictEquipShout;
-		} else {
-			notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictEquipDebuff : restrictEquip;
+		switch (a_params.object->GetFormType()) {
+		case RE::FormType::Spell:
+			notification = isDebuff ? &restrictEquipSpellDebuff : &restrictEquipSpell;
+			break;
+		case RE::FormType::Shout:
+			notification = isDebuff ? &restrictEquipShoutDebuff : &restrictEquipShout;
+			break;
+		default:
+			notification = isDebuff ? &restrictEquipDebuff : &restrictEquip;
+			break;
 		}
 	} else if (a_params.restrictOn == RESTRICT_ON::kCast) {
-		notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictCastDebuff : restrictCast;
-	} else {
-		notification = a_params.restrictType == RESTRICT_TYPE::kDebuff ? restrictPickUpDebuff : restrictPickUp;
+		notification = isDebuff ? &restrictCastDebuff : &restrictCast;
+	} else {  // kPickUp
+		notification = isDebuff ? &restrictPickUpDebuff : &restrictPickUp;
 	}
 
-	if (!notification.show) {
+	if (!notification->show) {
 		return finalNotification;
 	}
 
 	switch (a_params.restrictReason) {
 	case RESTRICT_REASON::kGeneric:
-		finalNotification = notification.generic;
+		finalNotification = notification->generic;
 		break;
 	case RESTRICT_REASON::kSkill:
-		finalNotification = notification.skill;
+		finalNotification = notification->skill;
 		break;
 	case RESTRICT_REASON::kLevel:
-		finalNotification = notification.level;
+		finalNotification = notification->level;
 		break;
 	}
 
+	std::string_view placeholder;
 	if (a_params.restrictOn == RESTRICT_ON::kCast) {
-		string::replace_all(finalNotification, "{magicItem}", a_params.object->GetName());
+		placeholder = "{magicItem}"sv;
 	} else {
-		if (a_params.object->Is(RE::FormType::Spell)) {
-			string::replace_all(finalNotification, "{spell}", a_params.object->GetName());
-		} else if (a_params.object->Is(RE::FormType::Shout)) {
-			string::replace_all(finalNotification, "{shout}", a_params.object->GetName());
-		} else {
-			string::replace_all(finalNotification, "{item}", a_params.object->GetName());
+		switch (a_params.object->GetFormType()) {
+		case RE::FormType::Spell:
+			placeholder = "{spell}"sv;
+			break;
+		case RE::FormType::Shout:
+			placeholder = "{shout}"sv;
+			break;
+		default:
+			placeholder = "{item}"sv;
+			break;
 		}
 	}
 
+	string::replace_all(finalNotification, placeholder, a_params.object->GetName());
 	return finalNotification;
 }
