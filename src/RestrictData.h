@@ -56,14 +56,17 @@ private:
 	mutable FlatSet<RE::TESBoundObject*> wornObjects;
 	mutable StringSet                    actorKeywords;
 	mutable StringSet                    wornObjectKeywords;
-	mutable bool                         wornObjectsInitialized;
-	mutable bool                         actorKeywordsInitialized;
-	mutable bool                         wornObjectKeywordsInitialized;
+	mutable StringSet                    activeEffectKeywords;
+	mutable bool                         wornObjectsInit;
+	mutable bool                         actorKeywordsInit;
+	mutable bool                         wornObjectKeywordsInit;
+	mutable bool                         activeEffectKeywordsInit;
 
 	void collectKeywords(StringSet& a_set, RE::BGSKeywordForm* a_form) const;
 	void cache_actor_keywords() const;
 	void cache_worn_objects() const;
 	void cache_worn_object_keywords() const;
+	void cache_active_effect_keywords() const;
 };
 
 struct RestrictFilter

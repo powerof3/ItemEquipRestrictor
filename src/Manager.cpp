@@ -45,27 +45,32 @@ namespace ItemRestrictor
 
 	RestrictResult Manager::ShouldSkip(RestrictParams& a_params)
 	{
+		RestrictResult result;
+		
+		RestrictData restrictData(a_params);
+		if (!restrictData.actor || !restrictData.object) {
+			return result;
+		}
+		
 		if (a_params.object->Is(RE::FormType::Shout)) {
-			RestrictResult result;
-
 			const auto shout = a_params.object->As<RE::TESShout>();
 			for (std::uint32_t i = 0; i < 3; ++i) {
 				const auto& shoutWord = shout->variations[i];
 				if (shoutWord.spell) {
-					result = ShouldSkip(shoutWord.spell->As<RE::BGSKeywordForm>(), a_params);
+					result = ShouldSkip(shoutWord.spell->As<RE::BGSKeywordForm>(), restrictData, a_params);
 					if (result.shouldSkip) {
 						break;
 					}
 				}
 			}
-
-			return result;
 		} else {
-			return ShouldSkip(a_params.object->As<RE::BGSKeywordForm>(), a_params);
+			result = ShouldSkip(a_params.object->As<RE::BGSKeywordForm>(), restrictData, a_params);
 		}
+
+		return result;
 	}
 
-	RestrictResult Manager::ShouldSkip(RE::BGSKeywordForm* a_keywordForm, RestrictParams& a_params)
+	RestrictResult Manager::ShouldSkip(RE::BGSKeywordForm* a_keywordForm, const RestrictData& a_data, RestrictParams& a_params)
 	{
 		RestrictResult result;
 
@@ -73,14 +78,9 @@ namespace ItemRestrictor
 			return result;
 		}
 
-		RestrictData restrictData(a_params);
-		if (!restrictData.actor || !restrictData.object) {
-			return result;
-		}
-
 		a_keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
 			if (const auto edid = a_keyword->GetFormEditorID(); !string::is_empty(edid)) {
-				if (result = ShouldSkip(edid, restrictData, a_params); result.shouldSkip) {
+				if (result = ShouldSkip(edid, a_data, a_params); result.shouldSkip) {
 					return RE::BSContainer::ForEachResult::kStop;
 				}
 			}

@@ -18,7 +18,7 @@ namespace ItemRestrictor
 
 		RestrictResult ShouldSkip(const std::string& a_keywordEDID, const RestrictData& a_data, RestrictParams& a_params);
 		RestrictResult ShouldSkip(RestrictParams& a_params);
-		RestrictResult ShouldSkip(RE::BGSKeywordForm* a_keyword, RestrictParams& a_params);
+		RestrictResult ShouldSkip(RE::BGSKeywordForm* a_keyword, const RestrictData& a_data, RestrictParams& a_params);
 
 		void AddDebuff(const RE::TESBoundObject* a_item, RE::TESForm* a_debuffForm, bool equip);
 		void RemoveDebuff(const RE::TESBoundObject* a_item, bool equip);

@@ -250,9 +250,10 @@ RestrictFilter::RestrictFilter(const std::string& a_keywordEDID, RESTRICT_ON a_r
 RestrictData::RestrictData(const RestrictParams& a_baseParams) :
 	actor(a_baseParams.actor),
 	object(a_baseParams.object),
-	wornObjectsInitialized(false),
-	actorKeywordsInitialized(false),
-	wornObjectKeywordsInitialized(false)
+	wornObjectsInit(false),
+	actorKeywordsInit(false),
+	wornObjectKeywordsInit(false),
+	activeEffectKeywordsInit(false)
 {
 	auto npc = a_baseParams.actor->GetActorBase();
 	if (npc) {
@@ -280,7 +281,12 @@ bool RestrictData::match_keyword(const std::string& a_filter) const
 	}
 
 	cache_worn_object_keywords();
-	return wornObjectKeywords.contains(a_filter);
+	if (wornObjectKeywords.contains(a_filter)) {
+		return true;
+	}
+
+	cache_active_effect_keywords();
+	return activeEffectKeywords.contains(a_filter);
 }
 
 void RestrictData::collectKeywords(StringSet& a_set, RE::BGSKeywordForm* a_form) const
@@ -296,19 +302,19 @@ void RestrictData::collectKeywords(StringSet& a_set, RE::BGSKeywordForm* a_form)
 
 void RestrictData::cache_actor_keywords() const
 {
-	if (actorKeywordsInitialized) {
+	if (actorKeywordsInit) {
 		return;
 	}
 
 	collectKeywords(actorKeywords, actor->GetActorBase());
 	collectKeywords(actorKeywords, actor->GetRace());
 
-	actorKeywordsInitialized = true;
+	actorKeywordsInit = true;
 }
 
 void RestrictData::cache_worn_objects() const
 {
-	if (wornObjectsInitialized) {
+	if (wornObjectsInit) {
 		return;
 	}
 
@@ -319,12 +325,12 @@ void RestrictData::cache_worn_objects() const
 		}
 	}
 
-	wornObjectsInitialized = true;
+	wornObjectsInit = true;
 }
 
 void RestrictData::cache_worn_object_keywords() const
 {
-	if (wornObjectKeywordsInitialized) {
+	if (wornObjectKeywordsInit) {
 		return;
 	}
 
@@ -332,7 +338,27 @@ void RestrictData::cache_worn_object_keywords() const
 	for (auto& item : wornObjects) {
 		collectKeywords(wornObjectKeywords, item->As<RE::BGSKeywordForm>());
 	}
-	wornObjectKeywordsInitialized = true;
+	wornObjectKeywordsInit = true;
+}
+
+void RestrictData::cache_active_effect_keywords() const
+{
+	if (activeEffectKeywordsInit) {
+		return;
+	}
+
+	if (auto activeEffects = actor->GetActiveEffectList()) {
+		for (const auto& ae : *activeEffects) {
+			if (ae && ae->flags.none(RE::ActiveEffect::Flag::kInactive) && ae->spell) {
+				collectKeywords(activeEffectKeywords, ae->spell);
+				if (auto effect = ae->spell->GetAVEffect()) {
+					collectKeywords(activeEffectKeywords, effect);
+				}
+			}
+		}
+	}
+
+	activeEffectKeywordsInit = true;
 }
 
 bool RestrictData::is_bow_or_crossbow(RE::TESForm* a_object)
