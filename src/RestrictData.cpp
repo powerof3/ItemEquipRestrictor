@@ -72,31 +72,30 @@ RestrictFilter::Filter::Filter(const std::string& a_filter)
 
 bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictParams& a_params) const
 {
-	bool result = false;
+	bool match = false;
+
 	std::visit(overload{
 				   [&](FLAGS a_flags) {
 					   switch (a_flags) {
-					   case Filter::FLAGS::kIsMale:
-						   result = invertFilter ? a_data.sex == RE::SEX::kFemale : a_data.sex == RE::SEX::kMale;
+					   case FLAGS::kIsMale:
+						   match = (a_data.sex == RE::SEX::kMale);
 						   break;
-					   case Filter::FLAGS::kIsFemale:
-						   result = invertFilter ? a_data.sex == RE::SEX::kMale : a_data.sex == RE::SEX::kFemale;
+					   case FLAGS::kIsFemale:
+						   match = (a_data.sex == RE::SEX::kFemale);
 						   break;
-					   case Filter::FLAGS::kIsPlayer:
-						   result = invertFilter ? !a_data.isPlayer : a_data.isPlayer;
+					   case FLAGS::kIsPlayer:
+						   match = a_data.isPlayer;
 						   break;
-					   case Filter::FLAGS::kIsNPC:
-						   result = invertFilter ? a_data.isPlayer : !a_data.isPlayer;
+					   case FLAGS::kIsNPC:
+						   match = !a_data.isPlayer;
 						   break;
-					   case Filter::FLAGS::kIsInCombat:
-						   result = invertFilter ? !a_data.isInCombat : a_data.isInCombat;
-						   break;
-					   default:
+					   case FLAGS::kIsInCombat:
+						   match = a_data.isInCombat;
 						   break;
 					   }
 				   },
 				   [&](const ShortOrGlobal& a_level) {
-					   std::uint16_t level;
+					   std::uint16_t level = 0;
 					   std::visit(overload{
 									  [&](std::uint16_t b_level) {
 										  level = b_level;
@@ -106,90 +105,65 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 									  },
 								  },
 						   a_level);
-					   if (bool match = a_data.actorLevel >= level; invertFilter ? !match : match) {
-						   result = true;
-					   }
+					   match = a_data.actorLevel >= level;
 					   a_params.restrictReason = RESTRICT_REASON::kLevel;
 				   },
-				   [&](const std::pair<FactionOrAV, FloatOrGlobal>& a_level) {
-					   float minLevel = 0;
+				   [&](const std::pair<FactionOrAV, FloatOrGlobal>& a_pair) {
+					   float level = 0.0f;
 					   std::visit(overload{
-									  [&](float b_level) {
-										  minLevel = b_level;
+									  [&](float val) {
+										  level = val;
 									  },
 									  [&](RE::TESGlobal* global) {
-										  minLevel = global ? global->value : 0.0f;
+										  level = global ? global->value : 0.0f;
 									  },
 								  },
-						   a_level.second);
+						   a_pair.second);
+
 					   std::visit(overload{
 									  [&](RE::ActorValue av) {
-										  float currentValue = a_data.actor->GetActorValue(av);
-										  if (const bool match = currentValue >= minLevel; invertFilter ? !match : match) {
-											  result = true;
-										  }
+										  match = a_data.actor->GetActorValue(av) >= level;
 										  a_params.restrictReason = RESTRICT_REASON::kSkill;
 									  },
 									  [&](RE::TESFaction* faction) {
 										  float factionRank = faction ? static_cast<float>(a_data.actor->GetFactionRank(faction, a_data.isPlayer)) : -1.0f;
-										  if (const bool match = factionRank >= minLevel; invertFilter ? !match : match) {
-											  result = true;
-										  }
+										  match = factionRank >= level;
 									  },
 								  },
-						   a_level.first);
+						   a_pair.first);
 				   },
 				   [&](RE::TESForm* a_form) {
 					   switch (a_form->GetFormType()) {
 					   case RE::FormType::Faction:
-						   {
-							   bool match = a_data.actor->IsInFaction(a_form->As<RE::TESFaction>());
-							   result = invertFilter ? !match : match;
-						   }
+						   match = a_data.actor->IsInFaction(a_form->As<RE::TESFaction>());
 						   break;
 					   case RE::FormType::Perk:
-						   {
-							   bool match = a_data.actor->HasPerk(a_form->As<RE::BGSPerk>());
-							   result = invertFilter ? !match : match;
-						   }
+						   match = a_data.actor->HasPerk(a_form->As<RE::BGSPerk>());
 						   break;
 					   case RE::FormType::Race:
-						   {
-							   bool match = a_data.actor->GetRace() == a_form;
-							   result = invertFilter ? !match : match;
-						   }
+						   match = a_data.actor->GetRace() == a_form;
 						   break;
 					   case RE::FormType::Spell:
-						   {
-							   bool match = a_data.actor->HasSpell(a_form->As<RE::SpellItem>());
-							   result = invertFilter ? !match : match;
-						   }
+						   match = a_data.actor->HasSpell(a_form->As<RE::SpellItem>());
 						   break;
 					   case RE::FormType::MagicEffect:
-						   {
-							   bool match = a_data.actor->HasMagicEffect(a_form->As<RE::EffectSetting>());
-							   result = invertFilter ? !match : match;
-						   }
+						   match = a_data.actor->HasMagicEffect(a_form->As<RE::EffectSetting>());
+						   break;
+					   case RE::FormType::Weapon:
+					   case RE::FormType::Armor:
+						   match = a_data.has_worn_object(a_form->As<RE::TESBoundObject>());
 						   break;
 					   default:
 						   break;
 					   }
 				   },
 				   [&](const std::string& a_keyword) {
-					   bool match = a_data.match_keyword(a_keyword, a_data.object);
-					   result = invertFilter ? !match : match;
+					   match = a_data.match_keyword(a_keyword);
 				   },
 			   },
 		filter);
 
-	return result;
-}
-
-bool RestrictFilter::FilterGroup::MatchFilter(const RestrictData& a_data, RestrictParams& a_params) const
-{
-	return std::ranges::all_of(filters, [&](const auto& filter) {
-		return filter.MatchFilter(a_data, a_params);
-	});
+	return invertFilter ? !match : match;
 }
 
 RESTRICT_ON RestrictFilter::GetRestrictType(const std::string& a_keywordEDID)
@@ -209,6 +183,13 @@ RESTRICT_ON RestrictFilter::GetRestrictType(const std::string& a_keywordEDID)
 	return RESTRICT_ON::kInvalid;
 }
 
+bool RestrictFilter::FilterGroup::MatchFilter(const RestrictData& a_data, RestrictParams& a_params) const
+{
+	return std::ranges::all_of(filters, [&](const auto& filter) {
+		return filter.MatchFilter(a_data, a_params);
+	});
+}
+
 RestrictResult RestrictFilter::MatchFilter(const RestrictData& a_data, RestrictParams& a_params)
 {
 	RestrictResult result{};
@@ -217,17 +198,20 @@ RestrictResult RestrictFilter::MatchFilter(const RestrictData& a_data, RestrictP
 		return result;
 	}
 
-	result.debuffForm = debuffForm;
+	if (filtersALL.empty() && filtersANY.empty()) {
+		return result;
+	}
 
-	bool shouldSkipALL = !filtersALL.empty() && std::ranges::none_of(filtersALL, [&](const auto& filterGroup) {
+	bool matchesGroups = std::ranges::any_of(filtersALL, [&](const auto& filterGroup) {
 		return filterGroup.MatchFilter(a_data, a_params);
 	});
 
-	bool shouldSkipANY = !filtersANY.empty() && std::ranges::none_of(filtersANY, [&](const auto& filter) {
+	bool matchesAny = std::ranges::any_of(filtersANY, [&](const auto& filter) {
 		return filter.MatchFilter(a_data, a_params);
 	});
 
-	result.shouldSkip = shouldSkipALL && shouldSkipANY;
+	result.shouldSkip = !(matchesGroups || matchesAny);
+	result.debuffForm = debuffForm;
 
 	return result;
 }
@@ -265,33 +249,90 @@ RestrictFilter::RestrictFilter(const std::string& a_keywordEDID, RESTRICT_ON a_r
 
 RestrictData::RestrictData(const RestrictParams& a_baseParams) :
 	actor(a_baseParams.actor),
-	object(a_baseParams.object)
+	object(a_baseParams.object),
+	wornObjectsInitialized(false),
+	actorKeywordsInitialized(false),
+	wornObjectKeywordsInitialized(false)
 {
 	auto npc = a_baseParams.actor->GetActorBase();
 	if (npc) {
 		sex = npc->GetSex();
 		actorLevel = npc->GetLevel();
-		inventoryMap = actor->GetInventory();
 		isPlayer = actor->IsPlayerRef();
 		isInCombat = actor->IsInCombat();
-		valid = true;
 	} else {
-		valid = false;
+		actor = nullptr;
+		object = nullptr;
 	}
 }
 
-bool RestrictData::match_keyword(const std::string& a_filter, RE::TESForm* a_object) const
+bool RestrictData::has_worn_object(RE::TESForm* a_form) const
 {
-	if (actor->HasKeywordString(a_filter)) {
+	cache_worn_objects();
+	return wornObjects.contains(a_form->As<RE::TESBoundObject>());
+}
+
+bool RestrictData::match_keyword(const std::string& a_filter) const
+{
+	cache_actor_keywords();
+	if (actorKeywords.contains(a_filter)) {
 		return true;
 	}
-	for (auto& [item, data] : inventoryMap) {
+
+	cache_worn_object_keywords();
+	return wornObjectKeywords.contains(a_filter);
+}
+
+void RestrictData::collectKeywords(StringSet& a_set, RE::BGSKeywordForm* a_form) const
+{
+	if (a_form) {
+		a_form->ForEachKeyword([&](RE::BGSKeyword* a_kw) {
+			if (auto edid = a_kw->GetFormEditorID(); edid && *edid)
+				a_set.emplace(edid);
+			return RE::BSContainer::ForEachResult::kContinue;
+		});
+	}
+}
+
+void RestrictData::cache_actor_keywords() const
+{
+	if (actorKeywordsInitialized) {
+		return;
+	}
+
+	collectKeywords(actorKeywords, actor->GetActorBase());
+	collectKeywords(actorKeywords, actor->GetRace());
+
+	actorKeywordsInitialized = true;
+}
+
+void RestrictData::cache_worn_objects() const
+{
+	if (wornObjectsInitialized) {
+		return;
+	}
+
+	for (auto& [item, data] : actor->GetInventory()) {
 		auto& [count, entry] = data;
-		if (entry->IsWorn() && count > 0 && item != a_object && item->HasKeywordByEditorID(a_filter)) {
-			return true;
+		if (item && item != object && entry->IsWorn() && count > 0) {
+			wornObjects.emplace(item);
 		}
 	}
-	return false;
+
+	wornObjectsInitialized = true;
+}
+
+void RestrictData::cache_worn_object_keywords() const
+{
+	if (wornObjectKeywordsInitialized) {
+		return;
+	}
+
+	cache_worn_objects();
+	for (auto& item : wornObjects) {
+		collectKeywords(wornObjectKeywords, item->As<RE::BGSKeywordForm>());
+	}
+	wornObjectKeywordsInitialized = true;
 }
 
 bool RestrictData::is_bow_or_crossbow(RE::TESForm* a_object)

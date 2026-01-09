@@ -74,7 +74,7 @@ namespace ItemRestrictor
 		}
 
 		RestrictData restrictData(a_params);
-		if (!restrictData.valid) {
+		if (!restrictData.actor || !restrictData.object) {
 			return result;
 		}
 

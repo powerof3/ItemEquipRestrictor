@@ -41,17 +41,29 @@ struct RestrictData
 	RestrictData() = default;
 	RestrictData(const RestrictParams& a_baseParams);
 
-	bool        match_keyword(const std::string& a_filter, RE::TESForm* a_object) const;
+	bool        has_worn_object(RE::TESForm* a_form) const;
+	bool        match_keyword(const std::string& a_filter) const;
 	static bool is_bow_or_crossbow(RE::TESForm* a_object);
 
-	RE::Actor*                          actor;
-	RE::TESForm*                        object;
-	RE::SEX                             sex;
-	std::uint16_t                       actorLevel;
-	RE::TESObjectREFR::InventoryItemMap inventoryMap;
-	bool                                isPlayer;
-	bool                                isInCombat;
-	bool                                valid;
+	RE::Actor*    actor;
+	RE::TESForm*  object;
+	RE::SEX       sex;
+	bool          isPlayer;
+	bool          isInCombat;
+	std::uint16_t actorLevel;
+
+private:
+	mutable FlatSet<RE::TESBoundObject*> wornObjects;
+	mutable StringSet                    actorKeywords;
+	mutable StringSet                    wornObjectKeywords;
+	mutable bool                         wornObjectsInitialized;
+	mutable bool                         actorKeywordsInitialized;
+	mutable bool                         wornObjectKeywordsInitialized;
+
+	void collectKeywords(StringSet& a_set, RE::BGSKeywordForm* a_form) const;
+	void cache_actor_keywords() const;
+	void cache_worn_objects() const;
+	void cache_worn_object_keywords() const;
 };
 
 struct RestrictFilter
