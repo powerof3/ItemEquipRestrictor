@@ -147,13 +147,13 @@ namespace Hooks
 
 	struct DropObject
 	{
-		static void thunk(RE::Actor* a_actor, const RE::TESBoundObject* a_object, RE::ExtraDataList* a_extraList, std::int32_t a_count, const RE::NiPoint3* a_dropLoc, const RE::NiPoint3* a_rotate)
+		static RE::ObjectRefHandle* thunk(RE::Actor* a_actor, RE::ObjectRefHandle& a_refHandleOut, const RE::TESBoundObject* a_object, RE::ExtraDataList* a_extraList, std::int32_t a_count, const RE::NiPoint3* a_dropLoc, const RE::NiPoint3* a_rotate)
 		{
 			if (a_object) {
 				ItemRestrictor::Manager::GetSingleton()->RemoveDebuff(a_object, false);
 			}
 
-			return func(a_actor, a_object, a_extraList, a_count, a_dropLoc, a_rotate);
+			return func(a_actor, a_refHandleOut, a_object, a_extraList, a_count, a_dropLoc, a_rotate);
 		}
 		static inline REL::Relocation<decltype(thunk)> func;
 		static inline constexpr std::size_t            idx = 0x0CB;
