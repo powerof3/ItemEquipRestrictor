@@ -151,6 +151,7 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 						   break;
 					   case RE::FormType::Weapon:
 					   case RE::FormType::Armor:
+					   case RE::FormType::Ammo:
 						   match = a_data.has_worn_object(a_form->As<RE::TESBoundObject>());
 						   break;
 					   default:
