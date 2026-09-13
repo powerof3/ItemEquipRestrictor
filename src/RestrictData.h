@@ -126,6 +126,8 @@ struct RestrictFilter
 	static RESTRICT_ON GetRestrictType(const std::string& a_keywordEDID);
 	RestrictResult     MatchFilter(const RestrictData& a_data, RestrictParams& a_baseParams);
 
+	static bool HasActiveMagicEffect(RE::Actor* a_actor, const RE::EffectSetting* a_mgef);
+
 	// members
 	RESTRICT_ON              restrictOn{ RESTRICT_ON::kInvalid };
 	std::vector<FilterGroup> filtersALL;

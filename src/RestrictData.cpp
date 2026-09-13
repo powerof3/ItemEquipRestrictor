@@ -147,7 +147,7 @@ bool RestrictFilter::Filter::MatchFilter(const RestrictData& a_data, RestrictPar
 						   match = a_data.actor->HasSpell(a_form->As<RE::SpellItem>());
 						   break;
 					   case RE::FormType::MagicEffect:
-						   match = a_data.actor->HasMagicEffect(a_form->As<RE::EffectSetting>());
+						   match = HasActiveMagicEffect(a_data.actor, a_form->As<RE::EffectSetting>());
 						   break;
 					   case RE::FormType::Weapon:
 					   case RE::FormType::Armor:
@@ -215,6 +215,36 @@ RestrictResult RestrictFilter::MatchFilter(const RestrictData& a_data, RestrictP
 	result.debuffForm = debuffForm;
 
 	return result;
+}
+
+bool RestrictFilter::HasActiveMagicEffect(RE::Actor* a_actor, const RE::EffectSetting* a_mgef)
+{
+	using AE = RE::ActiveEffect::Flag;
+
+	if (!a_actor) {
+		return false;
+	}
+	if (!a_mgef) {
+		return false;
+	}
+#ifndef SKYRIMVR
+	if (const auto activeEffects = a_actor->GetActiveEffectList(); activeEffects) {
+		return std::ranges::any_of(*activeEffects, [&](auto const& ae) {
+			return ae && ae->effect && ae->effect->baseEffect == a_mgef && ae->flags.none(AE::kInactive) && ae->flags.none(AE::kDispelled);
+		});
+	}
+#else
+	std::vector<RE::ActiveEffect*> activeEffects;
+	a_actor->VisitActiveEffects([&](RE::ActiveEffect* ae) -> RE::BSContainer::ForEachResult {
+		if (ae)
+			activeEffects.push_back(ae);
+		return RE::BSContainer::ForEachResult::kContinue;
+	});
+	return std::ranges::any_of(activeEffects, [&](auto const& ae) {
+		return ae && ae->effect && ae->effect->baseEffect == a_mgef && ae->flags.none(AE::kInactive) && ae->flags.none(AE::kDispelled);
+	});
+#endif
+	return false;
 }
 
 RestrictFilter::FilterGroup::FilterGroup(const std::string& a_filter)
