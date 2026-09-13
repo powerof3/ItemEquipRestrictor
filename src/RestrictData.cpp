@@ -10,7 +10,7 @@ RestrictFilter::Filter::Filter(const std::string& a_filter)
 		invertFilter = false;
 	}
 
-	switch (string::const_hash(filter_copy)) {
+	switch (REX::STR::CONST_HASH(filter_copy)) {
 	case "Male"_h:
 		filter = FLAGS::kIsMale;
 		break;
@@ -29,11 +29,11 @@ RestrictFilter::Filter::Filter(const std::string& a_filter)
 	default:
 		{
 			if (filter_copy.starts_with("Level(")) {
-				static srell::regex pattern(R"(\(([^)]+)\))");
-				if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
+				static boost::regex pattern(R"(\(([^)]+)\))");
+				if (boost::smatch matches; boost::regex_search(filter_copy, matches, pattern)) {
 					ShortOrGlobal level;
-					if (string::is_only_digit(matches[1].str())) {
-						level = string::to_num<std::uint16_t>(matches[1].str());
+					if (REX::STR::IS_ONLY_DIGIT(matches[1].str())) {
+						level = REX::STR::TO_NUM<std::uint16_t>(matches[1].str());
 					} else {
 						level = RE::TESForm::LookupByEditorID<RE::TESGlobal>(matches[1].str());
 					}
@@ -41,20 +41,20 @@ RestrictFilter::Filter::Filter(const std::string& a_filter)
 				}
 				return;
 			} else if (filter_copy.contains("(")) {
-				static srell::regex pattern(R"(([^\(]*)\(([^)]+)\))");
-				if (srell::smatch matches; srell::regex_search(filter_copy, matches, pattern)) {
+				static boost::regex pattern(R"(([^\(]*)\(([^)]+)\))");
+				if (boost::smatch matches; boost::regex_search(filter_copy, matches, pattern)) {
 					std::pair<FactionOrAV, FloatOrGlobal> factionOrAV;
 					const auto&                           first = matches[1].str();
 					const auto&                           second = matches[2].str();
-					if (string::is_only_digit(first)) {
-						factionOrAV.first = string::to_num<RE::ActorValue>(first);
+					if (REX::STR::IS_ONLY_DIGIT(first)) {
+						factionOrAV.first = REX::STR::TO_NUM<RE::ActorValue>(first);
 					} else if (const auto faction = RE::TESForm::LookupByEditorID<RE::TESFaction>(first)) {
 						factionOrAV.first = faction;
 					} else {
 						factionOrAV.first = RE::ActorValueList::GetSingleton()->LookupActorValueByName(first.c_str());
 					}
-					if (string::is_only_digit(second)) {
-						factionOrAV.second = string::to_num<float>(second);
+					if (REX::STR::IS_ONLY_DIGIT(second)) {
+						factionOrAV.second = REX::STR::TO_NUM<float>(second);
 					} else {
 						factionOrAV.second = RE::TESForm::LookupByEditorID<RE::TESGlobal>(second);
 					}
@@ -219,7 +219,7 @@ RestrictResult RestrictFilter::MatchFilter(const RestrictData& a_data, RestrictP
 
 RestrictFilter::FilterGroup::FilterGroup(const std::string& a_filter)
 {
-	const auto split_filters = string::split(a_filter, "+");
+	const auto split_filters = REX::STR::SPLIT(a_filter, "+");
 	filters.reserve(split_filters.size());
 	for (auto& filter : split_filters) {
 		filters.emplace_back(filter);
@@ -229,12 +229,12 @@ RestrictFilter::FilterGroup::FilterGroup(const std::string& a_filter)
 RestrictFilter::RestrictFilter(const std::string& a_keywordEDID, RESTRICT_ON a_restrictOn) :
 	restrictOn(a_restrictOn)
 {
-	const auto restrict_kywd = string::split(a_keywordEDID, ":");
+	const auto restrict_kywd = REX::STR::SPLIT(a_keywordEDID, ":");
 
 	// RestrictEquip:<Filters>:<Debuff>
 
 	if (restrict_kywd.size() > 1) {
-		const auto split_filters = string::split(restrict_kywd[1], ",");
+		const auto split_filters = REX::STR::SPLIT(restrict_kywd[1], ",");
 		for (const auto& filterStr : split_filters) {
 			if (filterStr.contains('+')) {
 				filtersALL.emplace_back(filterStr);

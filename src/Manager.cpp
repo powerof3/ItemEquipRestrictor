@@ -79,7 +79,7 @@ namespace ItemRestrictor
 		}
 
 		a_keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
-			if (const auto edid = a_keyword->GetFormEditorID(); !string::is_empty(edid)) {
+			if (const auto edid = a_keyword->GetFormEditorID(); !REX::STR::IS_EMPTY	(edid)) {
 				if (result = ShouldSkip(edid, a_data, a_params); result.shouldSkip) {
 					return RE::BSContainer::ForEachResult::kStop;
 				}
@@ -245,7 +245,7 @@ namespace ItemRestrictor
 			return RE::BSEventNotifyControl::kContinue;
 		}
 
-		switch (string::const_hash(a_evn->tag)) {
+		switch (REX::STR::CONST_HASH(a_evn->tag)) {
 		case "BeginCastLeft"_h:
 			ProcessShouldSkipCast(actor, actor->magicCasters[0]);
 			break;

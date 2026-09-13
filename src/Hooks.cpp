@@ -5,6 +5,7 @@
 
 namespace Hooks
 {
+	template <std::size_t N>
 	struct DoEquip
 	{
 		static void thunk(RE::ActorEquipManager* a_manager, RE::Actor* a_actor, RE::TESBoundObject* a_object, const RE::ObjectEquipParams& a_objectEquipParams)
@@ -161,17 +162,10 @@ namespace Hooks
 
 	void Install()
 	{
-		SKSE::AllocTrampoline(128);
-
-		std::array targets{
-			std::make_pair(RELOCATION_ID(37938, 38894), OFFSET(0xE5, 0x170)),  //ActorEquipManager::EquipObject
-			std::make_pair(RELOCATION_ID(37937, 38893), 0xBC),                 //ActorEquipManager::EquipImpl?
-		};
-
-		for (const auto& [id, offset] : targets) {
-			REL::Relocation<std::uintptr_t> target{ id, offset };
-			stl::write_thunk_call<DoEquip>(target.address());
-		}
+		REL::Relocation<std::uintptr_t> target_0{ RELOCATION_ID(37938, 38894), OFFSET(0xE5, 0x170) };   //ActorEquipManager::EquipObject
+		stl::write_thunk_call<DoEquip<0>>(target_0.address());
+		REL::Relocation<std::uintptr_t> target_1{ RELOCATION_ID(37937, 38893), 0xBC };  //ActorEquipManager::EquipImpl?
+		stl::write_thunk_call<DoEquip<1>>(target_1.address());
 
 		REL::Relocation<std::uintptr_t> targetMagic{ RELOCATION_ID(37973, 38928) };
 		stl::hook_function_prologue<DoEquipMagic, OFFSET(5, 6)>(targetMagic.address());

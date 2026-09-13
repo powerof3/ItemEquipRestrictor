@@ -5,7 +5,7 @@
 namespace ItemRestrictor
 {
 	class Manager :
-		public REX::Singleton<Manager>,
+		public REX::TSingleton<Manager>,
 		public RE::BSTEventSink<RE::TESEquipEvent>,
 		public RE::BSTEventSink<RE::TESObjectLoadedEvent>,
 		public RE::BSTEventSink<RE::TESSwitchRaceCompleteEvent>,

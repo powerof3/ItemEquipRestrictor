@@ -5,7 +5,7 @@
 #include <shared_mutex>
 
 #include "RE/Skyrim.h"
-#include "REX/REX/Singleton.h"
+#include "REX/REX.h"
 #include "SKSE/SKSE.h"
 
 #ifdef NDEBUG
@@ -13,23 +13,18 @@
 #else
 #	include <spdlog/sinks/msvc_sink.h>
 #endif
-#include <srell.hpp>
 #include <xbyak/xbyak.h>
 
+#include <boost/regex.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include "ClibUtil/editorID.hpp"
-#include "ClibUtil/simpleINI.hpp"
-#include "ClibUtil/string.hpp"
 
-namespace logger = SKSE::log;
-namespace string = clib_util::string;
 namespace edid = clib_util::editorID;
-namespace ini = clib_util::ini;
 
 using namespace std::literals;
-using namespace clib_util::string::literals;
+using namespace REX::STR::literals;
 
 // for visting variants
 template <class... Ts>
@@ -70,11 +65,11 @@ struct string_cmp
 
 	bool operator()(const std::string& str1, const std::string& str2) const
 	{
-		return string::iequals(str1, str2);
+		return REX::STR::IEQUALS(str1, str2);
 	}
 	bool operator()(std::string_view str1, std::string_view str2) const
 	{
-		return string::iequals(str1, str2);
+		return REX::STR::IEQUALS(str1, str2);
 	}
 };
 
@@ -85,12 +80,10 @@ using StringSet = FlatSet<std::string, string_hash, string_cmp>;
 
 namespace stl
 {
-	using namespace SKSE::stl;
-
 	template <class T>
 	void write_thunk_call(std::uintptr_t a_src)
 	{
-		auto& trampoline = SKSE::GetTrampoline();
+		auto& trampoline = REL::GetTrampoline();
 		T::func = trampoline.write_call<5>(a_src, T::thunk);
 	}
 
@@ -121,17 +114,39 @@ namespace stl
 		Patch p(a_src, BYTES);
 		p.ready();
 
-		auto& trampoline = SKSE::GetTrampoline();
-		trampoline.write_branch<5>(a_src, T::thunk);
+		auto& trampoline = REL::GetTrampoline();
+		trampoline.write_jmp<5>(a_src, T::thunk);
 
 		auto alloc = trampoline.allocate(p.getSize());
 		std::memcpy(alloc, p.getCode(), p.getSize());
 
 		T::func = reinterpret_cast<std::uintptr_t>(alloc);
 	}
+
+	template <class T>
+	T& get_setting_ref(REX::TSetting<T>& a_setting)
+	{
+		return static_cast<T&>(a_setting);
+	}
+
+	template <class T>
+	const T& get_setting_ref(const REX::TSetting<T>& a_setting)
+	{
+		return static_cast<const T&>(a_setting);
+	}
 }
 
-#define DLLEXPORT __declspec(dllexport)
+namespace Runtime
+{
+	inline constexpr REL::Version SSE_1_7_99(1, 7, 99, 0);
+	inline constexpr REL::Version MIN_ADDRESS_LIBRARY_V5 = SSE_1_7_99;
+
+	[[nodiscard]] inline bool IsAtLeast1_7_99() noexcept
+	{
+		static bool result = REX::FModule::GetExecutingModule().GetFileVersion() >= Runtime::SSE_1_7_99;
+		return result;
+	}
+}
 
 #ifdef SKYRIM_AE
 #	define OFFSET(se, ae) ae
