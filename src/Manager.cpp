@@ -10,6 +10,18 @@ namespace ItemRestrictor
 			scriptEventSourceHolder->AddEventSink<RE::TESObjectLoadedEvent>(GetSingleton());
 			scriptEventSourceHolder->AddEventSink<RE::TESSwitchRaceCompleteEvent>(GetSingleton());
 		}
+		if (const auto modCallbackSource = SKSE::GetModCallbackEventSource()) {
+			modCallbackSource->AddEventSink(GetSingleton());
+		}
+	}
+
+	void Manager::OnDataLoaded()
+	{
+		if (REX::W32::GetModuleHandleA("po3_KeywordItemDistributor.dll") != nullptr) {
+			REX::INFO("KID detected, waiting for KID_KeywordDistributionDone");
+			return;
+		}
+		LoadKeywords();
 	}
 
 	void Manager::AddAnimationEvent(const RE::Actor* a_actor)
@@ -22,40 +34,47 @@ namespace ItemRestrictor
 		a_actor->RemoveAnimationGraphEventSink(GetSingleton());
 	}
 
-	RestrictResult Manager::ShouldSkip(const std::string& a_keywordEDID, const RestrictData& a_data, RestrictParams& a_params)
+	void Manager::LoadKeywords()
 	{
-		RestrictResult result;
+		const auto manager = GetSingleton();
+		const auto dataHandler = RE::TESDataHandler::GetSingleton();
 
-		if (_rejectedKeywords.contains(a_keywordEDID)) {
-			return result;
-		}
+		manager->_restrictKeywords.clear();
 
-		auto it = _restrictKeywords.find(a_keywordEDID);
-		if (it == _restrictKeywords.end()) {
-			auto restrictType = RestrictFilter::GetRestrictType(a_keywordEDID);
-			if (restrictType == RESTRICT_ON::kInvalid) {
-				_rejectedKeywords.emplace(a_keywordEDID);
-				return result;
+		for (const auto keyword : dataHandler->GetFormArray<RE::BGSKeyword>()) {
+			if (!keyword) {
+				continue;
 			}
-			it = _restrictKeywords.try_emplace(a_keywordEDID, a_keywordEDID, restrictType).first;
+			const auto edid = keyword->GetFormEditorID();
+			if (REX::STR::IS_EMPTY(edid)) {
+				continue;
+			}
+			const auto restrictType = RestrictFilter::GetRestrictType(edid);
+			if (restrictType == RESTRICT_ON::kInvalid) {
+				continue;
+			}
+			manager->_restrictKeywords.try_emplace(keyword, edid, restrictType);
 		}
 
-		return it->second.MatchFilter(a_data, a_params);
+		REX::INFO("Loaded {} restrict keyword(s)", manager->_restrictKeywords.size());
 	}
 
 	RestrictResult Manager::ShouldSkip(RestrictParams& a_params)
 	{
 		RestrictResult result;
-		
+
+		if (_restrictKeywords.empty()) {
+			return result;
+		}
+
 		RestrictData restrictData(a_params);
 		if (!restrictData.actor || !restrictData.object) {
 			return result;
 		}
-		
+
 		if (a_params.object->Is(RE::FormType::Shout)) {
 			const auto shout = a_params.object->As<RE::TESShout>();
-			for (std::uint32_t i = 0; i < 3; ++i) {
-				const auto& shoutWord = shout->variations[i];
+			for (const auto& shoutWord : shout->variations) {
 				if (shoutWord.spell) {
 					result = ShouldSkip(shoutWord.spell->As<RE::BGSKeywordForm>(), restrictData, a_params);
 					if (result.shouldSkip) {
@@ -79,8 +98,8 @@ namespace ItemRestrictor
 		}
 
 		a_keywordForm->ForEachKeyword([&](const RE::BGSKeyword* a_keyword) {
-			if (const auto edid = a_keyword->GetFormEditorID(); !REX::STR::IS_EMPTY	(edid)) {
-				if (result = ShouldSkip(edid, a_data, a_params); result.shouldSkip) {
+			if (const auto it = _restrictKeywords.find(a_keyword); it != _restrictKeywords.end()) {
+				if (result = it->second.MatchFilter(a_data, a_params); result.shouldSkip) {
 					return RE::BSContainer::ForEachResult::kStop;
 				}
 			}
@@ -259,6 +278,14 @@ namespace ItemRestrictor
 			break;
 		}
 
+		return RE::BSEventNotifyControl::kContinue;
+	}
+
+	RE::BSEventNotifyControl Manager::ProcessEvent(SKSE::ModCallbackEvent const* a_evn, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
+	{
+		if (a_evn && a_evn->eventName == "KID_KeywordDistributionDone"sv) {
+			LoadKeywords();
+		}
 		return RE::BSEventNotifyControl::kContinue;
 	}
 }

@@ -4,10 +4,17 @@
 
 void MessageHandler(SKSE::MessagingInterface::Message* a_message)
 {
-	if (a_message->type == SKSE::MessagingInterface::kPostLoad) {
+	switch (a_message->type) {
+	case SKSE::MessagingInterface::kPostLoad:
 		Settings::GetSingleton()->LoadSettings();
 		ItemRestrictor::Manager::Register();
 		Hooks::Install();
+		break;
+	case SKSE::MessagingInterface::kDataLoaded:
+		ItemRestrictor::Manager::OnDataLoaded();
+		break;
+	default:
+		break;
 	}
 }
 
