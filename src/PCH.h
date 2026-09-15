@@ -87,11 +87,24 @@ namespace stl
 		T::func = trampoline.write_call<5>(a_src, T::thunk);
 	}
 
+	template <class T>
+	void write_thunk_jmp(std::uintptr_t a_src)
+	{
+		auto& trampoline = REL::GetTrampoline();
+		T::func = trampoline.write_jmp<5>(a_src, T::thunk);
+	}
+
+	template <class T>
+	void write_vfunc(const REL::ID& vtable)
+	{
+		REL::Relocation<std::uintptr_t> vtbl{ vtable };
+		T::func = vtbl.write_vfunc(T::idx, T::thunk);
+	}
+
 	template <class F, class T>
 	void write_vfunc()
 	{
-		REL::Relocation<std::uintptr_t> vtbl{ F::VTABLE[0] };
-		T::func = vtbl.write_vfunc(T::idx, T::thunk);
+		write_vfunc<T>(F::VTABLE[0]);
 	}
 
 	template <class T, std::size_t BYTES>

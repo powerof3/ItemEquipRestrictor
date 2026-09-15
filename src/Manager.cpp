@@ -38,6 +38,9 @@ namespace ItemRestrictor
 	{
 		const auto manager = GetSingleton();
 		const auto dataHandler = RE::TESDataHandler::GetSingleton();
+		if (!dataHandler) {
+			return;
+		}
 
 		manager->_restrictKeywords.clear();
 
